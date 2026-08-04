@@ -1,5 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
+import { withTransaction } from './util';
+
 /**
  * Schema migrations, applied in order and tracked with `PRAGMA user_version`.
  *
@@ -93,6 +95,95 @@ const MIGRATIONS: string[] = [
     ON budgets(category_id, COALESCE(month, '*'))
     WHERE deleted_at IS NULL;
   `,
+
+  // 2 — device settings
+  //
+  // Deliberately not a SyncableRecord. These are this device's preferences
+  // (which currency to read the ledger in, whether first run is done), not
+  // ledger data, so they carry no id, no household and no soft delete.
+  `
+  CREATE TABLE settings (
+    key        TEXT PRIMARY KEY NOT NULL,
+    value      TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  `,
+
+  // 3 — route palette
+  //
+  // Categories are routes on a rail diagram, so every seeded category moves
+  // onto one of the six line colours. Only the fixed seed ids are touched;
+  // anything the user made or recoloured keeps its own colour.
+  `
+  UPDATE categories SET color = '#009B4D' WHERE id = 'seed-groceries';
+  UPDATE categories SET color = '#0057FF' WHERE id = 'seed-rent-housing';
+  UPDATE categories SET color = '#FFB800' WHERE id = 'seed-utilities';
+  UPDATE categories SET color = '#E7002A' WHERE id = 'seed-transport';
+  UPDATE categories SET color = '#8E4EC6' WHERE id = 'seed-dining-out';
+  UPDATE categories SET color = '#00A3A3' WHERE id = 'seed-health';
+  UPDATE categories SET color = '#0057FF' WHERE id = 'seed-subscriptions';
+  UPDATE categories SET color = '#FFB800' WHERE id = 'seed-shopping';
+  UPDATE categories SET color = '#8E4EC6' WHERE id = 'seed-other';
+  UPDATE categories SET color = '#009B4D' WHERE id = 'seed-salary';
+  UPDATE categories SET color = '#00A3A3' WHERE id = 'seed-other-income';
+  `,
+
+  // 4 — scheduled services, goals and quick entries
+  //
+  // A recurring rule is a timetabled service: it does not store its own
+  // occurrences, it remembers the last date it ran so catch-up can materialise
+  // whatever became due while the app was closed. Transactions it creates carry
+  // `recurring_id`, so deleting a rule can leave its history alone.
+  `
+  CREATE TABLE recurring_rules (
+    id                TEXT PRIMARY KEY NOT NULL,
+    household_id      TEXT,
+    category_id       TEXT REFERENCES categories(id) ON DELETE SET NULL,
+    amount_cents      INTEGER NOT NULL,
+    description       TEXT NOT NULL DEFAULT '',
+    notes             TEXT,
+    frequency         TEXT NOT NULL CHECK (frequency IN ('weekly', 'biweekly', 'monthly')),
+    anchor_date       TEXT NOT NULL,
+    last_applied_date TEXT,
+    created_at        TEXT NOT NULL,
+    updated_at        TEXT NOT NULL,
+    deleted_at        TEXT
+  );
+
+  CREATE TABLE goals (
+    id           TEXT PRIMARY KEY NOT NULL,
+    household_id TEXT,
+    name         TEXT NOT NULL,
+    target_cents INTEGER NOT NULL,
+    saved_cents  INTEGER NOT NULL DEFAULT 0,
+    deadline     TEXT,
+    color        TEXT NOT NULL DEFAULT '#0057FF',
+    sort_order   INTEGER NOT NULL DEFAULT 0,
+    created_at   TEXT NOT NULL,
+    updated_at   TEXT NOT NULL,
+    deleted_at   TEXT
+  );
+
+  CREATE TABLE templates (
+    id           TEXT PRIMARY KEY NOT NULL,
+    household_id TEXT,
+    label        TEXT NOT NULL,
+    amount_cents INTEGER NOT NULL,
+    category_id  TEXT REFERENCES categories(id) ON DELETE SET NULL,
+    description  TEXT NOT NULL DEFAULT '',
+    sort_order   INTEGER NOT NULL DEFAULT 0,
+    created_at   TEXT NOT NULL,
+    updated_at   TEXT NOT NULL,
+    deleted_at   TEXT
+  );
+
+  ALTER TABLE transactions ADD COLUMN recurring_id TEXT;
+
+  -- The trash screen reads deleted rows newest first; every other query in the
+  -- app filters them out, so they need an index of their own.
+  CREATE INDEX idx_transactions_deleted ON transactions(deleted_at DESC)
+    WHERE deleted_at IS NOT NULL;
+  `,
 ];
 
 /** Categories a new install starts with, so the app is usable immediately. */
@@ -128,7 +219,7 @@ export async function migrateDatabase(db: SQLiteDatabase): Promise<void> {
   if (currentVersion >= MIGRATIONS.length) return;
 
   for (let version = currentVersion; version < MIGRATIONS.length; version++) {
-    await db.withExclusiveTransactionAsync(async (txn) => {
+    await withTransaction(db, async (txn) => {
       await txn.execAsync(MIGRATIONS[version]);
       if (version === 0) await seedCategories(txn);
       // PRAGMA does not accept bound parameters, and `version` is a loop

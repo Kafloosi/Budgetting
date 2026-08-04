@@ -76,6 +76,47 @@ export interface Transaction extends SyncableRecord {
    * imported. Null for manual entries. See `importHash` in ./hash.
    */
   import_hash: string | null;
+  /** Set when a recurring rule materialised this row. */
+  recurring_id: string | null;
+}
+
+export type RecurringFrequency = 'weekly' | 'biweekly' | 'monthly';
+
+/**
+ * A timetabled service: an entry that repeats on its own.
+ *
+ * Occurrences are not stored. `anchor_date` fixes the pattern and
+ * `last_applied_date` records how far it has run, so catch-up can work out
+ * exactly what became due while the app was closed without walking history.
+ */
+export interface RecurringRule extends SyncableRecord {
+  category_id: string | null;
+  /** Signed cents, same convention as a transaction. */
+  amount_cents: number;
+  description: string;
+  notes: string | null;
+  frequency: RecurringFrequency;
+  anchor_date: DateOnly;
+  last_applied_date: DateOnly | null;
+}
+
+/** A savings target. Money set aside is tracked here, not in the ledger. */
+export interface Goal extends SyncableRecord {
+  name: string;
+  target_cents: number;
+  saved_cents: number;
+  deadline: DateOnly | null;
+  color: string;
+  sort_order: number;
+}
+
+/** A one-tap entry for something bought at the same price over and over. */
+export interface Template extends SyncableRecord {
+  label: string;
+  amount_cents: number;
+  category_id: string | null;
+  description: string;
+  sort_order: number;
 }
 
 export interface Budget extends SyncableRecord {

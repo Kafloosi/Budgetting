@@ -1,7 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 import type { DateOnly, MonthKey, Transaction, TransactionSource } from '../types';
-import { monthBounds, newId, nowIso } from '../util';
+import { monthBounds, newId, nowIso, withTransaction } from '../util';
 
 export interface TransactionInput {
   /** Signed cents: negative for spending, positive for income. */
@@ -27,6 +27,8 @@ export interface TransactionQuery {
   categoryId?: string;
   /** Case-insensitive substring match on description and notes. */
   search?: string;
+  /** `out` is spending, `in` is income. Omit for both. */
+  direction?: 'in' | 'out';
   limit?: number;
   offset?: number;
 }
@@ -48,6 +50,9 @@ function buildFilter(query: TransactionQuery): { where: string; params: (string 
     clauses.push('(t.description LIKE ? COLLATE NOCASE OR t.notes LIKE ? COLLATE NOCASE)');
     const like = `%${query.search}%`;
     params.push(like, like);
+  }
+  if (query.direction) {
+    clauses.push(query.direction === 'in' ? 't.amount_cents > 0' : 't.amount_cents < 0');
   }
 
   return { where: clauses.join(' AND '), params };
@@ -165,7 +170,7 @@ export async function bulkInsertImported(
   let inserted = 0;
   const now = nowIso();
 
-  await db.withExclusiveTransactionAsync(async (txn) => {
+  await withTransaction(db, async (txn) => {
     for (const row of rows) {
       const result = await txn.runAsync(
         `INSERT OR IGNORE INTO transactions
@@ -190,6 +195,68 @@ export async function bulkInsertImported(
   });
 
   return { inserted, skipped: rows.length - inserted };
+}
+
+export interface MonthTotals {
+  /** Positive cents received. */
+  income_cents: number;
+  /** Positive cents spent. */
+  expense_cents: number;
+  /** Signed: income minus spending. */
+  net_cents: number;
+  count: number;
+}
+
+/** The month in three numbers, for the top of the Month screen. */
+export async function getMonthTotals(db: SQLiteDatabase, month: MonthKey): Promise<MonthTotals> {
+  const { start, end } = monthBounds(month);
+  const row = await db.getFirstAsync<MonthTotals>(
+    `SELECT COALESCE(SUM(CASE WHEN amount_cents > 0 THEN amount_cents END), 0)  AS income_cents,
+            COALESCE(SUM(CASE WHEN amount_cents < 0 THEN -amount_cents END), 0) AS expense_cents,
+            COALESCE(SUM(amount_cents), 0)                                      AS net_cents,
+            COUNT(*)                                                            AS count
+       FROM transactions
+      WHERE deleted_at IS NULL AND date BETWEEN ? AND ?`,
+    [start, end],
+  );
+  return row ?? { income_cents: 0, expense_cents: 0, net_cents: 0, count: 0 };
+}
+
+export interface CategorySpend {
+  category_id: string | null;
+  category_name: string | null;
+  category_color: string | null;
+  category_icon: string | null;
+  /** Positive cents spent this month. */
+  spent_cents: number;
+}
+
+/**
+ * Spending per category for a month, biggest first.
+ *
+ * Includes categories with no budget, which is how the Month screen can offer
+ * to put a limit on whatever is quietly eating the month.
+ */
+export async function getCategorySpend(
+  db: SQLiteDatabase,
+  month: MonthKey,
+): Promise<CategorySpend[]> {
+  const { start, end } = monthBounds(month);
+  return db.getAllAsync<CategorySpend>(
+    `SELECT t.category_id,
+            c.name  AS category_name,
+            c.color AS category_color,
+            c.icon  AS category_icon,
+            SUM(-t.amount_cents) AS spent_cents
+       FROM transactions t
+       LEFT JOIN categories c ON c.id = t.category_id
+      WHERE t.deleted_at IS NULL
+        AND t.amount_cents < 0
+        AND t.date BETWEEN ? AND ?
+      GROUP BY t.category_id
+      ORDER BY spent_cents DESC`,
+    [start, end],
+  );
 }
 
 /** Distinct `YYYY-MM` keys that have at least one transaction, newest first. */

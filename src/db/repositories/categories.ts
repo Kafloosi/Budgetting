@@ -1,7 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 import type { Category, CategoryKind } from '../types';
-import { newId, nowIso } from '../util';
+import { newId, nowIso, withTransaction } from '../util';
 
 export interface CategoryInput {
   name: string;
@@ -79,7 +79,7 @@ export async function updateCategory(
  */
 export async function deleteCategory(db: SQLiteDatabase, id: string): Promise<void> {
   const now = nowIso();
-  await db.withExclusiveTransactionAsync(async (txn) => {
+  await withTransaction(db, async (txn) => {
     await txn.runAsync('UPDATE categories SET deleted_at = ?, updated_at = ? WHERE id = ?', [
       now,
       now,

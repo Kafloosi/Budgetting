@@ -1,6 +1,27 @@
 import * as Crypto from 'expo-crypto';
+import type { SQLiteDatabase } from 'expo-sqlite';
+import { Platform } from 'react-native';
 
 import type { DateOnly, MonthKey, Timestamp } from './types';
+
+/**
+ * Runs `work` inside a transaction on every platform.
+ *
+ * `withExclusiveTransactionAsync` throws on web — wa-sqlite has no second
+ * connection to lock out — so web falls back to an ordinary transaction. It
+ * gives up the exclusivity guarantee, which only matters when two connections
+ * write at once, and web is a single-connection development surface.
+ */
+export async function withTransaction(
+  db: SQLiteDatabase,
+  work: (txn: SQLiteDatabase) => Promise<void>,
+): Promise<void> {
+  if (Platform.OS === 'web') {
+    await db.withTransactionAsync(() => work(db));
+    return;
+  }
+  await db.withExclusiveTransactionAsync(work);
+}
 
 /** UUID v4. Generated on-device so offline creates never collide. */
 export function newId(): string {
@@ -36,6 +57,49 @@ export function toDateOnly(date: Date): DateOnly {
   const month = `${date.getMonth() + 1}`.padStart(2, '0');
   const day = `${date.getDate()}`.padStart(2, '0');
   return `${date.getFullYear()}-${month}-${day}`;
+}
+
+/** Shifts a `YYYY-MM-DD` by whole days, staying on the calendar. */
+export function shiftDays(date: DateOnly, delta: number): DateOnly {
+  const [year, month, day] = date.split('-').map(Number);
+  return toDateOnly(new Date(year, month - 1, day + delta));
+}
+
+/**
+ * Shifts a `YYYY-MM-DD` by whole months, clamped to the end of the target
+ * month. The 31st plus one month is the 28th of February, not the 3rd of
+ * March — a rule anchored on the 31st has to keep landing in its own month.
+ */
+export function shiftDaysByMonth(date: DateOnly, delta: number): DateOnly {
+  const [year, month, day] = date.split('-').map(Number);
+  const lastDay = new Date(year, month + delta, 0).getDate();
+  return toDateOnly(new Date(year, month - 1 + delta, Math.min(day, lastDay)));
+}
+
+/** Whole months from one `YYYY-MM` to another; negative when `to` is earlier. */
+export function monthsBetween(from: MonthKey, to: MonthKey): number {
+  const [fromYear, fromMonth] = from.split('-').map(Number);
+  const [toYear, toMonth] = to.split('-').map(Number);
+  return (toYear - fromYear) * 12 + (toMonth - fromMonth);
+}
+
+/** Days in a `YYYY-MM`. */
+export function daysInMonth(month: MonthKey): number {
+  const [year, monthIndex] = month.split('-').map(Number);
+  return new Date(year, monthIndex, 0).getDate();
+}
+
+/**
+ * How much of `month` has been lived through, in days.
+ *
+ * A past month is fully elapsed, a future one has not started, and the current
+ * month counts today — dividing by this never yields a divide-by-zero.
+ */
+export function elapsedDaysInMonth(month: MonthKey, today = new Date()): number {
+  const current = toMonthKey(today);
+  if (month < current) return daysInMonth(month);
+  if (month > current) return 0;
+  return today.getDate();
 }
 
 /** `YYYY-MM` for a Date or a `YYYY-MM-DD` string. */
