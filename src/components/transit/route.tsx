@@ -142,8 +142,9 @@ export function RouteLine({
                     y1={midY - weight * 0.85}
                     x2={at}
                     y2={midY + weight * 0.85}
-                    stroke={theme.ground}
+                    stroke={theme.ink}
                     strokeWidth={Stroke.tick}
+                    opacity={0.55}
                   />
                 );
               })
@@ -165,8 +166,9 @@ export function RouteLine({
                 y1={midY - weight}
                 x2={warnAt}
                 y2={midY + weight}
-                stroke={status === 'under' ? theme.ground : theme.ink}
+                stroke={theme.ink}
                 strokeWidth={Stroke.tick}
+                opacity={status === 'under' ? 0.55 : 1}
               />
               <Rect
                 x={terminusX - Stroke.tick}
@@ -216,7 +218,8 @@ export function RouteLine({
               height: weight * 2.4,
               borderRadius: weight * 1.2,
               borderColor: travelledColor,
-              backgroundColor: theme.ground,
+              // Porcelain, like every station bullet on a fired diagram.
+              backgroundColor: theme.ink,
             },
           ]}>
           <View

@@ -1,9 +1,13 @@
-# Budgetting
+# Fare
 
 A personal budgeting app for iOS and Android.
 
-**Status:** foundation only. The project scaffold and data layer are in place; no
-app screens have been built yet.
+**Status:** v1 UI built on the data layer. Every core screen exists, the app runs
+end to end, and it has not yet been near a store.
+
+Fare draws a month of money as a metropolitan rail diagram fired in enamel: each
+category is a route, its monthly limit is the end of the line, and spending is
+how far along you have travelled. The visual system is recorded in `DESIGN.md`.
 
 ## Requirements
 
@@ -24,10 +28,21 @@ via the Expo Go app over Wi-Fi.
 
 | Feature | Status |
 | --- | --- |
-| Manual expense tracking | Data layer done, no UI |
-| Budget limits + alerts | Data layer done, no UI |
-| Bank CSV import | Dedupe + bulk insert done; parsing and UI not started |
-| Charts and reports | Not started |
+| Manual entry (keypad, category, day, notes) | Built |
+| Quick entries — saved one-tap amounts | Built |
+| Budget limits, recurring or per-month | Built |
+| Month forecast and plain-language insights | Built |
+| Ledger with search, direction and line filters | Built |
+| Recurring entries, caught up on open | Built |
+| Savings goals with deadline suggestions | Built |
+| Bank CSV import, bank-agnostic column mapping | Built |
+| Stats — six months, or a full year by line | Built |
+| Trash with 30-day recovery, undo on delete | Built |
+| JSON backup and restore, CSV export | Built |
+| App lock via the phone's own biometrics | Built |
+| Budget alert notifications | Not started |
+| Receipt photos | Not started |
+| Cloud sync | Not started, by design |
 
 ### Data
 
@@ -43,26 +58,39 @@ seams exist now so adding sync later is not a migration nightmare.
 - **React Native 0.86** via **Expo SDK 57**, TypeScript
 - **expo-router** for file-based navigation
 - **expo-sqlite** for local storage
-- **react-native-svg** for charts (installed, unused so far)
-- **expo-document-picker** / **expo-file-system** for CSV import
+- **react-native-svg** for the route diagrams
+- **react-native-reanimated** for the travelling markers
+- **expo-document-picker** / **expo-file-system** for CSV import and backups
+- **expo-local-authentication** for the optional app lock
+- **Overpass** and **Overpass Mono**, self-hosted (SIL OFL, `assets/fonts/`)
 
 ## Project layout
 
 ```
 src/
-  app/          expo-router screens (still the template's)
-  components/   shared UI (still the template's)
-  constants/    theme tokens
+  app/                  expo-router screens
+    (tabs)/             Month, Ledger, Budgets, Settings
+    entry.tsx           the keypad sheet — the product's core path
+    budget, category, goal, recurring-rule   modal editors
+    categories, stats, goals, recurring, trash, backup, import
+    welcome.tsx         first run
+  components/
+    transit/            the world: icons, roundel, route, month-line,
+                        month-bars, keypad, tab-bar, forecast-panel
+    …                   text, button, field, money, screen, sheet, and the rest
+  constants/theme.ts    tokens: route colours, both appearances, type, motion
+  providers/            settings, ledger invalidation, catch-up, undo, app lock
   db/
     types.ts            domain types
-    migrations.ts       schema + migration runner
-    util.ts             ids, timestamps, month maths, import hashing
+    migrations.ts       schema + migration runner (append-only)
+    util.ts             ids, timestamps, month and day maths, import hashing
     repositories/       the only place SQL lives
-      categories.ts
-      transactions.ts
-      budgets.ts
   lib/
     money.ts            cents <-> display strings, input parsing
+    csv.ts, backup.ts, forecast.ts, insights.ts, currencies.ts, haptics.ts
+scripts/
+  make-icons.mjs        the roundel, as app icon and splash
+  make-textures.mjs     the two enamel surfaces
 ```
 
 ## Data model decisions
@@ -105,11 +133,25 @@ npm run typecheck
 On a fresh clone, run `npm start` once before `npm run typecheck`. Expo generates
 the git-ignored `expo-env.d.ts` on first start, and typechecking fails without it.
 
+## Verifying a change
+
+There is no test runner. `npm run typecheck` and `npm run lint` are the checks,
+and the app itself is the third one:
+
+```bash
+npm run typecheck
+npm run lint
+npm start          # Expo Go on a phone, or npm run android / npm run web
+```
+
+The loop worth walking after any change to the ledger: first run → log an expense
+on the keypad → it appears on Month and in the Ledger → put a limit on its
+category → watch the route cross under, warning and over → import a CSV twice and
+confirm the second import inserts nothing.
+
 ## Next steps
 
-1. Wrap the app in `<SQLiteProvider databaseName="budget.db" onInit={migrateDatabase}>`
-   in `src/app/_layout.tsx` — the data layer is written but not yet mounted.
-2. Build the transaction list and entry screens.
-3. Build the budgets screen on top of `getBudgetProgress`.
-4. CSV parsing for Dutch bank formats (ING, Rabobank, ABN), then the import UI.
-5. Charts.
+1. Budget alert notifications at 80% and over.
+2. Receipt photos on an entry.
+3. Per-bank CSV presets on top of the generic column mapping.
+4. Store identity: screenshots, listing copy, and an EAS build.

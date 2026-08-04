@@ -52,7 +52,8 @@ export default function GoalsScreen() {
       />
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {all.length > 0 ? <GoalsSummary goals={all} /> : null}
+        {/* With a single goal the card already says everything the summary would. */}
+        {all.length > 1 ? <GoalsSummary goals={all} /> : null}
 
         {all.length === 0 ? (
           <EmptyState

@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, Platform, ScrollView, StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/button';
 import { Screen, SectionLabel } from '@/components/screen';
@@ -36,7 +36,24 @@ export default function BackupScreen() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  /**
+   * Hands the file to the platform.
+   *
+   * Native writes it to the cache and opens the share sheet, which is how a
+   * backup gets off the phone at all. The web build has no share sheet and no
+   * filesystem to write to, so it does what a browser does: downloads it.
+   */
   async function share(name: string, contents: string, mimeType: string) {
+    if (Platform.OS === 'web') {
+      const url = URL.createObjectURL(new Blob([contents], { type: mimeType }));
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = name;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      return `Downloaded ${name}.`;
+    }
+
     const directory = new Directory(Paths.cache, 'fare-export');
     if (!directory.exists) directory.create({ intermediates: true });
 
