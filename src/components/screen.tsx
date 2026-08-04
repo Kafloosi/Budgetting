@@ -1,3 +1,4 @@
+import { Image } from 'expo-image';
 import type { ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
@@ -5,6 +6,17 @@ import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
 import { Text } from '@/components/text';
 import { MaxContentWidth, Space, Stroke } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+
+/**
+ * The surfaces the diagram is fired on. Vitreous enamel is never a flat fill —
+ * it carries a sprayed grain and a gloss where the light falls — so each
+ * appearance gets a real rasterised surface rather than a hex value.
+ * See `scripts/make-textures.mjs`.
+ */
+const SURFACE = {
+  enamel: require('@/assets/images/enamel-surface.png'),
+  porcelain: require('@/assets/images/porcelain-surface.png'),
+};
 
 /**
  * The enamel ground every screen is fired on, inside the safe area, with the
@@ -20,6 +32,17 @@ export function Screen({
   const theme = useTheme();
   return (
     <View style={[styles.ground, { backgroundColor: theme.ground }]}>
+      <Image
+        source={SURFACE[theme.scheme]}
+        style={StyleSheet.absoluteFill}
+        contentFit="cover"
+        pointerEvents="none"
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        // Decoded once and reused across every screen.
+        cachePolicy="memory-disk"
+        transition={0}
+      />
       <SafeAreaView style={styles.safe} edges={edges}>
         <View style={styles.column}>{children}</View>
       </SafeAreaView>

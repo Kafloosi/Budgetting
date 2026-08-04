@@ -94,19 +94,27 @@ export function StationBullet({
 }
 
 /**
- * A category, in its own route colour. The emoji is the user's own — the schema
- * has carried one per category since migration 0 — so it sits inside the ring
- * as content rather than standing in for an icon.
+ * A category, in its own route colour.
+ *
+ * Empty by default it would be a bare ring, so it falls back to the line's
+ * letter — which is how real networks name their lines, and which keeps the
+ * six-colour palette intact. An emoji only appears when the user chose one; it
+ * is their content, not this app's icon system.
  */
 export function CategoryRoundel({
   size = 36,
   color,
   icon,
+  name,
 }: {
   size?: number;
   color: string;
   icon?: string | null;
+  /** Supplies the line letter when there is no emoji. */
+  name?: string | null;
 }) {
+  const letter = name?.trim()?.[0]?.toUpperCase() ?? null;
+
   return (
     <View
       style={{
@@ -124,6 +132,18 @@ export function CategoryRoundel({
           allowFontScaling={false}
           accessible={false}>
           {icon}
+        </Text>
+      ) : letter ? (
+        <Text
+          style={{
+            fontFamily: FontFamily.sansHeavy,
+            fontSize: size * 0.46,
+            lineHeight: size * 0.56,
+            color,
+          }}
+          allowFontScaling={false}
+          accessible={false}>
+          {letter}
         </Text>
       ) : null}
     </View>

@@ -90,6 +90,7 @@ export default function TrashScreen() {
                   size={30}
                   color={row.category_color ?? theme.inkFaint}
                   icon={row.category_icon}
+                  name={row.category_name}
                 />
                 <View style={styles.body}>
                   <Text variant="label" numberOfLines={1}>

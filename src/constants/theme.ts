@@ -161,12 +161,17 @@ export const Type = {
     lineHeight: 42,
     letterSpacing: -1,
   },
-  /** Screen titles. */
+  /**
+   * Screen titles. Set in the same tracked caps as the station labels — the
+   * diagram has one display register, not a sentence-case one for screens and
+   * a caps one for sheets.
+   */
   title: {
     fontFamily: FontFamily.sansHeavy,
-    fontSize: 28,
+    fontSize: 26,
     lineHeight: 32,
-    letterSpacing: -0.4,
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
   },
   /**
    * Station label — the diagram's own voice. All section headings, tab labels

@@ -186,14 +186,17 @@ export default function LedgerScreen() {
           <SwipeToDelete
             onDelete={() => remove(item)}
             accessibilityLabel={`Delete ${item.description || 'transaction'}`}>
-            <View style={{ backgroundColor: theme.ground }}>
-              <TransactionRow
-                transaction={item}
-                first={index === 0}
-                last={index === section.data.length - 1}
-                onPress={() => router.push({ pathname: '/entry', params: { id: item.id } })}
-              />
-            </View>
+            {/*
+              No background here: the delete panel is revealed beside the row,
+              not beneath it, and painting the row opaque would cover the
+              enamel surface with a visible seam.
+            */}
+            <TransactionRow
+              transaction={item}
+              first={index === 0}
+              last={index === section.data.length - 1}
+              onPress={() => router.push({ pathname: '/entry', params: { id: item.id } })}
+            />
           </SwipeToDelete>
         )}
         ListEmptyComponent={
@@ -254,7 +257,7 @@ function FilterChip({
         },
       ]}>
       {icon ? (
-        <CategoryRoundel size={22} color={color} icon={icon} />
+        <CategoryRoundel size={22} color={color} icon={icon} name={label} />
       ) : (
         <View style={[styles.chipBullet, { borderColor: color, backgroundColor: active ? color : 'transparent' }]} />
       )}

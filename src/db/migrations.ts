@@ -184,6 +184,18 @@ const MIGRATIONS: string[] = [
   CREATE INDEX idx_transactions_deleted ON transactions(deleted_at DESC)
     WHERE deleted_at IS NOT NULL;
   `,
+
+  // 5 — clear the seeded emoji
+  //
+  // A shipped default that fills every roundel on the Month screen with
+  // multi-colour emoji fights the six-colour route palette it sits inside. The
+  // roundel falls back to the line's letter instead, which is how a network
+  // names its lines. The column stays, and an emoji the user picks themselves
+  // is still their content and still shown.
+  `
+  UPDATE categories SET icon = ''
+   WHERE id LIKE 'seed-%' AND deleted_at IS NULL;
+  `,
 ];
 
 /** Categories a new install starts with, so the app is usable immediately. */

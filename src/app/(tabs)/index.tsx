@@ -190,6 +190,7 @@ export default function MonthScreen() {
                   size={28}
                   color={entry.category_color ?? theme.inkFaint}
                   icon={entry.category_icon}
+                  name={entry.category_name}
                 />
                 <Text variant="body" numberOfLines={1} style={styles.unbudgetedName}>
                   {entry.category_name ?? 'Unassigned'}
@@ -255,7 +256,7 @@ export default function MonthScreen() {
                     styles.unbudgeted,
                     { backgroundColor: pressed ? theme.raised : 'transparent' },
                   ]}>
-                  <View style={[styles.goalStripe, { backgroundColor: goal.color }]} />
+                  <CategoryRoundel size={26} color={goal.color} name={goal.name} />
                   <Text variant="body" numberOfLines={1} style={styles.unbudgetedName}>
                     {goal.name}
                   </Text>
@@ -337,11 +338,6 @@ const styles = StyleSheet.create({
   },
   insightText: {
     flex: 1,
-  },
-  goalStripe: {
-    width: Stroke.route,
-    height: 28,
-    borderRadius: Stroke.route / 2,
   },
   section: {
     gap: Space.xs,

@@ -66,7 +66,7 @@ export default function CategoryScreen() {
     if (id) {
       await updateCategory(db, id, { name: trimmed, kind, color, icon });
     } else {
-      await createCategory(db, { name: trimmed, kind, color, icon: icon || '📍' });
+      await createCategory(db, { name: trimmed, kind, color, icon });
     }
     invalidate();
     router.back();
@@ -103,7 +103,7 @@ export default function CategoryScreen() {
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.preview}>
-          <CategoryRoundel size={56} color={color} icon={icon || '📍'} />
+          <CategoryRoundel size={56} color={color} icon={icon} name={name || undefined} />
           <View style={[styles.previewLine, { backgroundColor: color }]} />
           <Text variant="bodyStrong" numberOfLines={1} style={styles.previewName}>
             {name.trim() || 'Unnamed line'}

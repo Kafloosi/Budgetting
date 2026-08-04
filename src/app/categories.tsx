@@ -121,6 +121,7 @@ function Section({
               size={32}
               color={category.archived ? theme.inkFaint : category.color}
               icon={category.icon}
+              name={category.name}
             />
             <Text
               variant="body"

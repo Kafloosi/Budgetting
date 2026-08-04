@@ -8,6 +8,7 @@ import { Screen, SectionLabel } from '@/components/screen';
 import { SheetHeader } from '@/components/sheet';
 import { Text } from '@/components/text';
 import { MonthBars } from '@/components/transit/month-bars';
+import { RouteLine } from '@/components/transit/route';
 import { CategoryRoundel } from '@/components/transit/roundel';
 import { Line, Radius, Space, Stroke, TouchTarget } from '@/constants/theme';
 import {
@@ -130,6 +131,7 @@ export default function StatsScreen() {
                       size={26}
                       color={entry.category_color ?? theme.inkFaint}
                       icon={entry.category_icon}
+                      name={entry.category_name}
                     />
                     <Text variant="body" numberOfLines={1} style={styles.breakdownName}>
                       {entry.category_name ?? 'Unassigned'}
@@ -139,17 +141,12 @@ export default function StatsScreen() {
                     </Text>
                     <Money cents={-entry.spent_cents} variant="amount" colorIncome={false} />
                   </View>
-                  <View style={[styles.shareTrack, { backgroundColor: theme.rule }]}>
-                    <View
-                      style={[
-                        styles.shareFill,
-                        {
-                          width: `${Math.max(2, share * 100)}%`,
-                          backgroundColor: entry.category_color ?? theme.inkFaint,
-                        },
-                      ]}
-                    />
-                  </View>
+                  <RouteLine
+                    color={entry.category_color ?? theme.inkFaint}
+                    ratio={share}
+                    status="under"
+                    variant="share"
+                  />
                 </View>
               );
             })}
@@ -283,15 +280,6 @@ const styles = StyleSheet.create({
   },
   breakdownName: {
     flex: 1,
-  },
-  shareTrack: {
-    height: Stroke.route,
-    borderRadius: Stroke.route / 2,
-    overflow: 'hidden',
-  },
-  shareFill: {
-    height: Stroke.route,
-    borderRadius: Stroke.route / 2,
   },
   footnote: {
     paddingHorizontal: Space.xl,

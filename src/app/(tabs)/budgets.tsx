@@ -111,7 +111,12 @@ export default function BudgetsScreen() {
                     styles.row,
                     { backgroundColor: pressed ? theme.raised : 'transparent' },
                   ]}>
-                  <CategoryRoundel size={30} color={category.color} icon={category.icon} />
+                  <CategoryRoundel
+                    size={30}
+                    color={category.color}
+                    icon={category.icon}
+                    name={category.name}
+                  />
                   <View style={styles.rowBody}>
                     <Text variant="body" numberOfLines={1}>
                       {category.name}

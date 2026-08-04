@@ -54,7 +54,12 @@ export function BudgetRoute({
         { backgroundColor: pressed ? theme.raised : 'transparent' },
       ]}>
       <View style={styles.head}>
-        <CategoryRoundel size={32} color={progress.category_color} icon={progress.category_icon} />
+        <CategoryRoundel
+          size={32}
+          color={progress.category_color}
+          icon={progress.category_icon}
+          name={progress.category_name}
+        />
         <Text variant="bodyStrong" numberOfLines={1} style={styles.name}>
           {progress.category_name}
         </Text>

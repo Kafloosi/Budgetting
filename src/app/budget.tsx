@@ -104,7 +104,12 @@ export default function BudgetScreen() {
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.identity}>
-          <CategoryRoundel size={44} color={color} icon={category.data?.icon} />
+          <CategoryRoundel
+            size={44}
+            color={color}
+            icon={category.data?.icon}
+            name={category.data?.name}
+          />
           <View style={styles.identityBody}>
             <Text variant="bodyStrong">{category.data?.name ?? '—'}</Text>
             <Text variant="caption" tone="muted">

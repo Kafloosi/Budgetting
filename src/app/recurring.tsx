@@ -74,6 +74,7 @@ export default function RecurringScreen() {
                     size={32}
                     color={rule.category_color ?? theme.inkFaint}
                     icon={rule.category_icon}
+                    name={rule.category_name}
                   />
                   <View style={styles.body}>
                     <Text variant="bodyStrong" numberOfLines={1}>

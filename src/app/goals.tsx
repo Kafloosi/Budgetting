@@ -9,6 +9,7 @@ import { Screen } from '@/components/screen';
 import { SheetHeader } from '@/components/sheet';
 import { Text } from '@/components/text';
 import { RouteLine } from '@/components/transit/route';
+import { CategoryRoundel } from '@/components/transit/roundel';
 import { Line, Radius, Space, Stroke, TouchTarget } from '@/constants/theme';
 import { contributeToGoal, goalProgress, listGoals } from '@/db/repositories/goals';
 import type { Goal } from '@/db/types';
@@ -51,6 +52,8 @@ export default function GoalsScreen() {
       />
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {all.length > 0 ? <GoalsSummary goals={all} /> : null}
+
         {all.length === 0 ? (
           <EmptyState
             accent={Line.teal}
@@ -67,10 +70,53 @@ export default function GoalsScreen() {
         {all.length > 0 ? (
           <View style={styles.footer}>
             <Button label="New goal" onPress={() => router.push('/goal')} variant="secondary" />
+            <Text variant="caption" tone="muted" style={styles.note}>
+              Money set aside here is not a transaction. Nothing leaves your account and nothing is
+              charged against a monthly limit — a goal only tracks what you have decided to keep
+              back.
+            </Text>
           </View>
         ) : null}
       </ScrollView>
     </Screen>
+  );
+}
+
+/** Every goal read as one length of track, so the whole plan has a shape. */
+function GoalsSummary({ goals }: { goals: Goal[] }) {
+  const theme = useTheme();
+  const money = useMoney();
+
+  const saved = goals.reduce((sum, goal) => sum + goal.saved_cents, 0);
+  const target = goals.reduce((sum, goal) => sum + goal.target_cents, 0);
+  const reached = goals.filter((goal) => goalProgress(goal).reached).length;
+
+  return (
+    <View style={styles.summary}>
+      <View style={styles.summaryHead}>
+        <Text variant="station" tone="muted">
+          Set aside
+        </Text>
+        <View style={styles.goalAmounts}>
+          <Money cents={saved} variant="amount" colorIncome={false} />
+          <Text variant="amountSmall" tone="faint">
+            {` / ${money.plain(target)}`}
+          </Text>
+        </View>
+      </View>
+      <RouteLine
+        color={Line.teal}
+        ratio={target > 0 ? saved / target : 0}
+        status="under"
+        variant="share"
+      />
+      <Text variant="caption" tone="muted">
+        {`${goals.length} ${goals.length === 1 ? 'goal' : 'goals'}${
+          reached > 0 ? `, ${reached} reached` : ''
+        }.`}
+      </Text>
+      <View style={[styles.summaryRule, { backgroundColor: theme.rule }]} />
+    </View>
   );
 }
 
@@ -105,7 +151,7 @@ function GoalCard({
           styles.goalHead,
           { backgroundColor: pressed ? theme.raised : 'transparent' },
         ]}>
-        <View style={[styles.goalStripe, { backgroundColor: goal.color }]} />
+        <CategoryRoundel size={32} color={goal.color} name={goal.name} />
         <View style={styles.goalBody}>
           <Text variant="bodyStrong" numberOfLines={1}>
             {goal.name}
@@ -173,14 +219,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Space.md,
-    paddingRight: Space.xl,
+    paddingHorizontal: Space.xl,
     paddingVertical: Space.md,
-  },
-  goalStripe: {
-    width: Stroke.route,
-    height: 40,
-    borderRadius: Stroke.route / 2,
-    marginLeft: Space.xl - Stroke.route,
   },
   goalBody: {
     flex: 1,
@@ -208,5 +248,22 @@ const styles = StyleSheet.create({
   },
   footer: {
     paddingHorizontal: Space.xl,
+    gap: Space.lg,
+  },
+  note: {
+    paddingHorizontal: Space.xs,
+  },
+  summary: {
+    paddingHorizontal: Space.xl,
+    gap: Space.sm,
+  },
+  summaryHead: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+  },
+  summaryRule: {
+    height: Stroke.hairline,
+    marginTop: Space.md,
   },
 });

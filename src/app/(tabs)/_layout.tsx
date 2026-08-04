@@ -1,4 +1,5 @@
 import { TabList, TabSlot, TabTrigger, Tabs } from 'expo-router/ui';
+import { StyleSheet } from 'react-native';
 
 import { TransitTabBar } from '@/components/transit/tab-bar';
 
@@ -9,10 +10,13 @@ import { TransitTabBar } from '@/components/transit/tab-bar';
  */
 export default function TabsLayout() {
   return (
-    <Tabs>
-      <TabSlot />
+    // Both the container and the slot have to claim the height explicitly, or
+    // the slot grows to its content and pushes the bar off the bottom of the
+    // screen — taking the entry action with it.
+    <Tabs style={styles.container}>
+      <TabSlot style={styles.slot} />
       <TransitTabBar />
-      <TabList style={{ display: 'none' }}>
+      <TabList style={styles.hidden}>
         <TabTrigger name="index" href="/" />
         <TabTrigger name="ledger" href="/ledger" />
         <TabTrigger name="budgets" href="/budgets" />
@@ -21,3 +25,15 @@ export default function TabsLayout() {
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  slot: {
+    flex: 1,
+  },
+  hidden: {
+    display: 'none',
+  },
+});

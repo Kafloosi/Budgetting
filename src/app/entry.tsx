@@ -272,7 +272,13 @@ export default function EntryScreen() {
           </View>
         ) : null}
 
+        {/*
+          Ordered by how often each is touched, because the keypad is docked
+          over the bottom of this list: whatever ends up under the fold should
+          be the field nobody fills in at a till.
+        */}
         <View style={styles.fields}>
+          <DayPicker value={date} onChange={setDate} accent={accent} />
           <TextField
             label="Description"
             value={description}
@@ -281,7 +287,6 @@ export default function EntryScreen() {
             returnKeyType="done"
             autoCapitalize="sentences"
           />
-          <DayPicker value={date} onChange={setDate} accent={accent} />
           <TextField
             label="Notes"
             value={notes}

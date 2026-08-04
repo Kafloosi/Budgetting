@@ -6,7 +6,7 @@ import Animated, {
   withTiming,
   Easing,
 } from 'react-native-reanimated';
-import { Defs, Line as SvgLine, Pattern, Rect, Svg } from 'react-native-svg';
+import { Defs, Line as SvgLine, Path, Pattern, Rect, Svg } from 'react-native-svg';
 
 import { Line, Motion, Radius, Stroke } from '@/constants/theme';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
@@ -17,8 +17,10 @@ import type { BudgetStatus } from '@/db/repositories/budgets';
  * A budget drawn as a length of route.
  *
  * The limit is the terminus bar. Spending is the distance travelled from the
- * origin bullet. The terminus always sits at the same fraction of the track so
- * two routes can be compared at a glance, and the strip beyond it is the
+ * origin, which the line reaches by climbing out of the row on the diagram's
+ * own 45° bend. Minor stations tick along the bed, the marker is a double-ring
+ * interchange, and the terminus always sits at the same fraction of the track
+ * so two routes can be compared at a glance. The strip beyond it is the
  * run-out: an over-budget route carries on into it, hatched, the way a diagram
  * marks a disrupted section.
  */
@@ -26,7 +28,19 @@ import type { BudgetStatus } from '@/db/repositories/budgets';
 /** Where the end-of-line bar sits along the track. The rest is run-out. */
 const TERMINUS_AT = 0.86;
 
+/** Width of the 45° climb out of the origin. */
+const BEND = 10;
+
+/** Minor stations between origin and terminus. */
+const MINOR_STATIONS = 3;
+
 const easing = Easing.bezier(...Motion.ease);
+
+export type RouteVariant =
+  /** Spend against a limit: terminus bar and hatched run-out. */
+  | 'budget'
+  /** A share of a whole: the track is the whole, no run-out. */
+  | 'share';
 
 export function RouteLine({
   color,
@@ -34,13 +48,15 @@ export function RouteLine({
   status,
   weight = Stroke.route,
   animate = true,
+  variant = 'budget',
 }: {
   color: string;
-  /** spent / limit. May exceed 1. */
+  /** spent / limit, or the share of the whole. May exceed 1 for budgets. */
   ratio: number;
   status: BudgetStatus;
   weight?: number;
   animate?: boolean;
+  variant?: RouteVariant;
 }) {
   const theme = useTheme();
   const reduceMotion = useReduceMotion();
@@ -48,12 +64,18 @@ export function RouteLine({
   // Pattern ids share a document on web, so each route needs its own.
   const hatchId = `runout-${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
 
-  const terminusX = track * TERMINUS_AT;
+  const isBudget = variant === 'budget';
+  const terminusX = isBudget ? track * TERMINUS_AT : track;
   const runOut = track - terminusX;
-  const travelled =
-    ratio <= 1
-      ? terminusX * Math.max(0, ratio)
-      : terminusX + Math.min(runOut, runOut * Math.min(1, ratio - 1));
+  const clamped = Math.max(0, ratio);
+  const travelled = isBudget
+    ? clamped <= 1
+      ? terminusX * clamped
+      : terminusX + Math.min(runOut, runOut * Math.min(1, clamped - 1))
+    : terminusX * Math.min(1, clamped);
+
+  const height = weight * 2.6;
+  const midY = height / 2;
 
   const progress = useSharedValue(0);
   useEffect(() => {
@@ -65,108 +87,145 @@ export function RouteLine({
     progress.value = withTiming(travelled, { duration: Motion.travel, easing });
   }, [travelled, track, animate, reduceMotion, progress]);
 
-  const travelStyle = useAnimatedStyle(() => ({ width: progress.value }));
+  const travelStyle = useAnimatedStyle(() => ({
+    width: Math.max(0, progress.value - BEND),
+  }));
   const markerStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: progress.value - weight * 0.9 }],
+    transform: [{ translateX: Math.max(BEND, progress.value) - weight * 1.2 }],
   }));
 
   const overshoot = status === 'over';
   const warnAt = terminusX * 0.8;
+  const travelledColor = overshoot ? Line.scarlet : color;
 
   return (
     <View
-      style={[styles.track, { height: weight * 2.2 }]}
+      style={[styles.track, { height }]}
       onLayout={(event: LayoutChangeEvent) => setTrack(event.nativeEvent.layout.width)}>
-      {/* Bed — the part of the route not yet travelled. */}
-      <View
-        style={[
-          styles.bed,
-          { height: weight, borderRadius: weight / 2, backgroundColor: theme.rule, width: terminusX },
-        ]}
-      />
-
-      {/* Run-out, hatched, sitting past the terminus. */}
       {track > 0 ? (
-        <View style={[styles.runOut, { left: terminusX, width: runOut, height: weight }]}>
-          <Svg width="100%" height={weight}>
-            <Defs>
-              <Pattern
-                id={hatchId}
-                patternUnits="userSpaceOnUse"
-                width={6}
+        <Svg width="100%" height={height} style={StyleSheet.absoluteFill}>
+          <Defs>
+            <Pattern
+              id={hatchId}
+              patternUnits="userSpaceOnUse"
+              width={6}
+              height={height}>
+              <SvgLine
+                x1={0}
+                y1={height}
+                x2={6}
+                y2={0}
+                stroke={overshoot ? Line.scarlet : theme.rule}
+                strokeWidth={2}
+              />
+            </Pattern>
+          </Defs>
+
+          {/* The bed: a 45° climb out of the row, then a level run to the end. */}
+          <Path
+            d={`M0 ${height - 1} L${BEND} ${midY} L${terminusX} ${midY}`}
+            stroke={theme.rule}
+            strokeWidth={weight}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fill="none"
+          />
+
+          {/* Minor stations — the intermediate stops a diagram always marks. */}
+          {isBudget
+            ? Array.from({ length: MINOR_STATIONS }).map((_, index) => {
+                const at = BEND + ((terminusX - BEND) * (index + 1)) / (MINOR_STATIONS + 1);
+                return (
+                  <SvgLine
+                    key={index}
+                    x1={at}
+                    y1={midY - weight * 0.85}
+                    x2={at}
+                    y2={midY + weight * 0.85}
+                    stroke={theme.ground}
+                    strokeWidth={Stroke.tick}
+                  />
+                );
+              })
+            : null}
+
+          {isBudget ? (
+            <>
+              <Rect
+                x={terminusX}
+                y={midY - weight / 2}
+                width={runOut}
                 height={weight}
-                patternTransform="rotate(0)">
-                <SvgLine
-                  x1={0}
-                  y1={weight}
-                  x2={6}
-                  y2={0}
-                  stroke={overshoot ? Line.scarlet : theme.rule}
-                  strokeWidth={2}
-                />
-              </Pattern>
-            </Defs>
-            <Rect
-              x={0}
-              y={0}
-              width="100%"
-              height={weight}
-              fill={`url(#${hatchId})`}
-              opacity={overshoot ? 1 : 0.5}
-            />
-          </Svg>
-        </View>
+                fill={`url(#${hatchId})`}
+                opacity={overshoot ? 1 : 0.45}
+              />
+              {/* The 80% notice, and the end of the line. */}
+              <SvgLine
+                x1={warnAt}
+                y1={midY - weight}
+                x2={warnAt}
+                y2={midY + weight}
+                stroke={status === 'under' ? theme.ground : theme.ink}
+                strokeWidth={Stroke.tick}
+              />
+              <Rect
+                x={terminusX - Stroke.tick}
+                y={midY - weight * 1.15}
+                width={Stroke.tick * 2}
+                height={weight * 2.3}
+                rx={1}
+                fill={theme.ink}
+              />
+            </>
+          ) : null}
+        </Svg>
       ) : null}
 
-      {/* Travelled — the money already spent. */}
-      <Animated.View
-        style={[
-          styles.travelled,
-          travelStyle,
-          { height: weight, borderRadius: weight / 2, backgroundColor: overshoot ? Line.scarlet : color },
-        ]}
-      />
-
-      {/* The 80% tick — the point a diagram would post a delay notice. */}
+      {/* Travelled — the money already spent, over the same bend. */}
       {track > 0 ? (
-        <View
-          style={[
-            styles.tick,
-            {
-              left: warnAt,
-              height: weight * 2.2,
-              backgroundColor: status === 'under' ? theme.ground : theme.ink,
-              opacity: status === 'under' ? 0.9 : 1,
-            },
-          ]}
-        />
+        <>
+          <View style={[styles.bendTravelled, { width: BEND, height }]}>
+            <Svg width={BEND} height={height}>
+              <Path
+                d={`M0 ${height - 1} L${BEND} ${midY}`}
+                stroke={travelledColor}
+                strokeWidth={weight}
+                strokeLinecap="round"
+                fill="none"
+              />
+            </Svg>
+          </View>
+          <Animated.View
+            style={[
+              styles.travelled,
+              travelStyle,
+              { left: BEND, height: weight, backgroundColor: travelledColor },
+            ]}
+          />
+        </>
       ) : null}
 
-      {/* End of line. */}
-      {track > 0 ? (
-        <View
-          style={[
-            styles.terminus,
-            { left: terminusX - Stroke.tick, height: weight * 2.2, backgroundColor: theme.ink },
-          ]}
-        />
-      ) : null}
-
-      {/* The train. */}
+      {/* The train, drawn as an interchange. */}
       {track > 0 ? (
         <Animated.View
           style={[
             styles.marker,
             markerStyle,
             {
-              width: weight * 1.8,
-              height: weight * 1.8,
-              borderRadius: weight,
-              borderColor: overshoot ? Line.scarlet : color,
+              width: weight * 2.4,
+              height: weight * 2.4,
+              borderRadius: weight * 1.2,
+              borderColor: travelledColor,
               backgroundColor: theme.ground,
             },
-          ]}
-        />
+          ]}>
+          <View
+            style={[
+              styles.markerCore,
+              { backgroundColor: travelledColor, width: weight * 0.7, height: weight * 0.7 },
+            ]}
+          />
+        </Animated.View>
       ) : null}
     </View>
   );
@@ -177,9 +236,7 @@ export function RouteLine({
  * answer to a horizontal divider.
  */
 export function RouteRule({ color, width = 32 }: { color: string; width?: number }) {
-  return (
-    <View style={[styles.rule, { width, backgroundColor: color }]} />
-  );
+  return <View style={[styles.rule, { width, backgroundColor: color }]} />;
 }
 
 const styles = StyleSheet.create({
@@ -187,31 +244,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: '100%',
   },
-  bed: {
+  bendTravelled: {
     position: 'absolute',
     left: 0,
-  },
-  runOut: {
-    position: 'absolute',
-    overflow: 'hidden',
   },
   travelled: {
     position: 'absolute',
-    left: 0,
-  },
-  tick: {
-    position: 'absolute',
-    width: Stroke.tick,
-  },
-  terminus: {
-    position: 'absolute',
-    width: Stroke.tick * 2,
-    borderRadius: 1,
   },
   marker: {
     position: 'absolute',
     left: 0,
     borderWidth: Stroke.tick,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  markerCore: {
+    borderRadius: Radius.full,
   },
   rule: {
     height: Stroke.tick * 2,

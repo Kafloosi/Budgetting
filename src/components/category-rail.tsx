@@ -46,7 +46,12 @@ export function CategoryRail({
                 { backgroundColor: selected ? category.color : theme.rule },
               ]}
             />
-            <CategoryRoundel size={44} color={selected ? category.color : theme.inkFaint} icon={category.icon} />
+            <CategoryRoundel
+              size={44}
+              color={selected ? category.color : theme.inkFaint}
+              icon={category.icon}
+              name={category.name}
+            />
             <Text
               variant="caption"
               tone={selected ? 'ink' : 'muted'}
