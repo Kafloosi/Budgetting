@@ -1,0 +1,204 @@
+import type { SQLiteDatabase } from 'expo-sqlite';
+
+import type { DateOnly, MonthKey, Transaction, TransactionSource } from '../types';
+import { monthBounds, newId, nowIso } from '../util';
+
+export interface TransactionInput {
+  /** Signed cents: negative for spending, positive for income. */
+  amount_cents: number;
+  date: DateOnly;
+  description: string;
+  category_id: string | null;
+  account_id?: string | null;
+  notes?: string | null;
+  source?: TransactionSource;
+  import_hash?: string | null;
+}
+
+/** A transaction joined with the display fields of its category. */
+export interface TransactionWithCategory extends Transaction {
+  category_name: string | null;
+  category_color: string | null;
+  category_icon: string | null;
+}
+
+export interface TransactionQuery {
+  month?: MonthKey;
+  categoryId?: string;
+  /** Case-insensitive substring match on description and notes. */
+  search?: string;
+  limit?: number;
+  offset?: number;
+}
+
+function buildFilter(query: TransactionQuery): { where: string; params: (string | number)[] } {
+  const clauses = ['t.deleted_at IS NULL'];
+  const params: (string | number)[] = [];
+
+  if (query.month) {
+    const { start, end } = monthBounds(query.month);
+    clauses.push('t.date BETWEEN ? AND ?');
+    params.push(start, end);
+  }
+  if (query.categoryId) {
+    clauses.push('t.category_id = ?');
+    params.push(query.categoryId);
+  }
+  if (query.search) {
+    clauses.push('(t.description LIKE ? COLLATE NOCASE OR t.notes LIKE ? COLLATE NOCASE)');
+    const like = `%${query.search}%`;
+    params.push(like, like);
+  }
+
+  return { where: clauses.join(' AND '), params };
+}
+
+export async function listTransactions(
+  db: SQLiteDatabase,
+  query: TransactionQuery = {},
+): Promise<TransactionWithCategory[]> {
+  const { where, params } = buildFilter(query);
+  const limit = query.limit ?? 500;
+  const offset = query.offset ?? 0;
+
+  return db.getAllAsync<TransactionWithCategory>(
+    `SELECT t.*,
+            c.name  AS category_name,
+            c.color AS category_color,
+            c.icon  AS category_icon
+       FROM transactions t
+       LEFT JOIN categories c ON c.id = t.category_id
+      WHERE ${where}
+      ORDER BY t.date DESC, t.created_at DESC
+      LIMIT ? OFFSET ?`,
+    [...params, limit, offset],
+  );
+}
+
+export async function getTransaction(
+  db: SQLiteDatabase,
+  id: string,
+): Promise<Transaction | null> {
+  return db.getFirstAsync<Transaction>(
+    'SELECT * FROM transactions WHERE id = ? AND deleted_at IS NULL',
+    [id],
+  );
+}
+
+export async function createTransaction(
+  db: SQLiteDatabase,
+  input: TransactionInput,
+): Promise<string> {
+  const id = newId();
+  const now = nowIso();
+
+  await db.runAsync(
+    `INSERT INTO transactions
+       (id, household_id, account_id, category_id, amount_cents, date, description,
+        notes, source, import_hash, created_at, updated_at, deleted_at)
+     VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+    [
+      id,
+      input.account_id ?? null,
+      input.category_id,
+      input.amount_cents,
+      input.date,
+      input.description,
+      input.notes ?? null,
+      input.source ?? 'manual',
+      input.import_hash ?? null,
+      now,
+      now,
+    ],
+  );
+
+  return id;
+}
+
+export async function updateTransaction(
+  db: SQLiteDatabase,
+  id: string,
+  patch: Partial<TransactionInput>,
+): Promise<void> {
+  const sets: string[] = [];
+  const params: (string | number | null)[] = [];
+
+  if (patch.amount_cents !== undefined) (sets.push('amount_cents = ?'), params.push(patch.amount_cents));
+  if (patch.date !== undefined) (sets.push('date = ?'), params.push(patch.date));
+  if (patch.description !== undefined) (sets.push('description = ?'), params.push(patch.description));
+  if (patch.category_id !== undefined) (sets.push('category_id = ?'), params.push(patch.category_id));
+  if (patch.account_id !== undefined) (sets.push('account_id = ?'), params.push(patch.account_id));
+  if (patch.notes !== undefined) (sets.push('notes = ?'), params.push(patch.notes));
+  if (sets.length === 0) return;
+
+  sets.push('updated_at = ?');
+  params.push(nowIso(), id);
+
+  await db.runAsync(`UPDATE transactions SET ${sets.join(', ')} WHERE id = ?`, params);
+}
+
+export async function deleteTransaction(db: SQLiteDatabase, id: string): Promise<void> {
+  const now = nowIso();
+  await db.runAsync('UPDATE transactions SET deleted_at = ?, updated_at = ? WHERE id = ?', [
+    now,
+    now,
+    id,
+  ]);
+}
+
+export interface BulkInsertResult {
+  inserted: number;
+  skipped: number;
+}
+
+/**
+ * Inserts imported rows, skipping any whose `import_hash` is already present.
+ *
+ * The dedupe leans on the partial unique index rather than a pre-flight SELECT,
+ * so a statement that overlaps a previous import cannot slip a duplicate
+ * through between the check and the write.
+ */
+export async function bulkInsertImported(
+  db: SQLiteDatabase,
+  rows: TransactionInput[],
+): Promise<BulkInsertResult> {
+  let inserted = 0;
+  const now = nowIso();
+
+  await db.withExclusiveTransactionAsync(async (txn) => {
+    for (const row of rows) {
+      const result = await txn.runAsync(
+        `INSERT OR IGNORE INTO transactions
+           (id, household_id, account_id, category_id, amount_cents, date, description,
+            notes, source, import_hash, created_at, updated_at, deleted_at)
+         VALUES (?, NULL, ?, ?, ?, ?, ?, ?, 'import', ?, ?, ?, NULL)`,
+        [
+          newId(),
+          row.account_id ?? null,
+          row.category_id,
+          row.amount_cents,
+          row.date,
+          row.description,
+          row.notes ?? null,
+          row.import_hash ?? null,
+          now,
+          now,
+        ],
+      );
+      if (result.changes > 0) inserted++;
+    }
+  });
+
+  return { inserted, skipped: rows.length - inserted };
+}
+
+/** Distinct `YYYY-MM` keys that have at least one transaction, newest first. */
+export async function listMonthsWithData(db: SQLiteDatabase): Promise<MonthKey[]> {
+  const rows = await db.getAllAsync<{ month: string }>(
+    `SELECT DISTINCT substr(date, 1, 7) AS month
+       FROM transactions
+      WHERE deleted_at IS NULL
+      ORDER BY month DESC`,
+  );
+  return rows.map((row) => row.month);
+}
