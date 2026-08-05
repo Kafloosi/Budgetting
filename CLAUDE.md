@@ -6,6 +6,22 @@ Local-first budgeting app, iOS + Android. v1 UI is built.
 
 Read first: `HANDOFF.md` (where we left off) · `DESIGN.md` (before any visual change) · `PRODUCT.md` (who it is for) · `README.md` (how it works).
 
+## Session start
+
+Open every session with ten things worth doing next. Before the greeting, before
+any question back.
+
+- Read `HANDOFF.md` and the `README.md` feature table first. The list is drawn
+  from the repo as it actually is, not from memory of it.
+- Ten lines, ranked, best first. One line each: what it is, and why it is worth
+  doing — the second half is the part that earns its place.
+- Mix scales. Features, gaps, bugs, papercuts, store readiness. A list of ten
+  features is a worse list.
+- Prefer what the code proves. A table that ships with no UI, a screen that ends
+  in a dead end, a `README.md` next step that never happened — these beat ideas.
+- Never invent work to reach ten. Say so and stop short.
+- Then wait. The list is an offer, not a plan.
+
 ## Commands
 
 ```bash
