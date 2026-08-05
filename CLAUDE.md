@@ -2,25 +2,18 @@
 
 # Fare
 
-Local-first budgeting app, iOS + Android. v1 UI is built.
-
-Read first: `HANDOFF.md` (where we left off) · `DESIGN.md` (before any visual change) · `PRODUCT.md` (who it is for) · `README.md` (how it works).
+Read first: `HANDOFF.md` · `DESIGN.md` · `PRODUCT.md` · `README.md`
 
 ## Session start
 
-Open every session with ten things worth doing next. Before the greeting, before
-any question back.
+Ten things worth doing next. Before the greeting, before any question back.
 
-- Read `HANDOFF.md` and the `README.md` feature table first. The list is drawn
-  from the repo as it actually is, not from memory of it.
-- Ten lines, ranked, best first. One line each: what it is, and why it is worth
-  doing — the second half is the part that earns its place.
-- Mix scales. Features, gaps, bugs, papercuts, store readiness. A list of ten
-  features is a worse list.
-- Prefer what the code proves. A table that ships with no UI, a screen that ends
-  in a dead end, a `README.md` next step that never happened — these beat ideas.
+- Read `HANDOFF.md` and the `README.md` feature table first.
+- Ten lines, ranked, best first. One line each: what it is, why it is worth doing.
+- Mix scales: features, gaps, bugs, papercuts, store readiness.
+- Prefer what the code proves over ideas.
 - Never invent work to reach ten. Say so and stop short.
-- Then wait. The list is an offer, not a plan.
+- Then wait.
 
 ## Commands
 
@@ -32,87 +25,97 @@ npm run typecheck
 npm run lint
 ```
 
-No tests exist. `typecheck` + `lint` are the only checks. On a fresh clone run `npm start` once first — it makes `expo-env.d.ts`.
+- No tests exist. `typecheck` + `lint` are the only checks.
+- Fresh clone: `npm start` once first. It makes `expo-env.d.ts`.
+- No iOS builds here. Use Expo Go on a real iPhone.
 
-No iOS builds here (Windows, no Xcode). Use Expo Go on a real iPhone.
+## Rules
 
-## Rules that break things if ignored
-
-- **Money is whole cents, never floats.** Text conversion only in `lib/money.ts`.
-- **Amounts are signed.** Expenses negative, income positive. Totals are `SUM`. Spend queries use `SUM(-amount_cents)`.
-- **IDs are UUIDs** (`newId()`). Two offline phones must not collide.
-- **Deletes are soft.** Always `WHERE deleted_at IS NULL`.
-- **SQL lives only in `db/repositories/`.** Screens call repo functions.
-- **Reads use `useLedgerQuery`. After every write call `useInvalidateLedger()`** or the screen will not update.
-- **Use `withTransaction()` from `db/util.ts`.** `withExclusiveTransactionAsync` throws on web.
-- **`MIGRATIONS` in `db/migrations.ts` is append-only.** Never edit or reorder a shipped one. Fix old seed rows in a new migration, by id.
-- **Imports dedupe on a content hash** (date + amount + cleaned description). Re-importing the same statement does nothing.
-- **Budgets: a `YYYY-MM` row beats the recurring row** (`month` is null).
+- Money is whole cents. Never floats. Text conversion only in `lib/money.ts`.
+- Amounts are signed. Expenses negative, income positive. Totals are `SUM`. Spend uses `SUM(-amount_cents)`.
+- IDs are UUIDs — `newId()`.
+- Deletes are soft. Always `WHERE deleted_at IS NULL`.
+- SQL only in `db/repositories/`. Screens call repo functions.
+- Reads use `useLedgerQuery`. After every write call `useInvalidateLedger()`.
+- Use `withTransaction()` from `db/util.ts`. Never `withExclusiveTransactionAsync`.
+- `MIGRATIONS` in `db/migrations.ts` is append-only. Never edit or reorder a shipped one. Fix old rows in a new migration, by id.
+- Imports dedupe on a content hash: date + amount + cleaned description.
+- Budgets: a `YYYY-MM` row beats the recurring row.
+- Import rules fill an empty category only. Never overwrite one set by hand.
 
 ## Design
 
-The direction contract is the comment at the top of `src/app/_layout.tsx`. Keep it true.
+Direction contract: the comment at the top of `src/app/_layout.tsx`. Keep it true.
 
 - Categories are rail routes. Six fixed line colours in `constants/theme.ts`.
-- Light and dark are both real enamel, not an inversion: line colours stay, ground and ink swap.
-- Budget trouble is never colour alone — say it in words too.
+- Light and dark both real. Line colours stay, ground and ink swap.
+- Budget trouble is never colour alone. Say it in words too.
+- Pill or plate. Nothing between.
+- Every amount goes through `Money`.
+- A line colour used as lettering takes the `onGround` variant.
+- Strokes are 1 / 2 / 6 / 10. Radii are full / 12 / 20 / 28.
 
 ## Skills
 
-Use the installed skills instead of winging it.
-
-- `/impeccable` — any UI, visual, or design work. `PRODUCT.md` and `DESIGN.md` are its records.
-- `expo:*` — Expo APIs, router, EAS builds and updates.
-- `superpowers:brainstorming` before building something new; `superpowers:systematic-debugging` on a bug.
+- `/impeccable` — any UI, visual, or design work.
+- `expo:*` — Expo APIs, router, EAS.
+- `superpowers:brainstorming` before building something new.
+- `superpowers:systematic-debugging` on a bug.
 
 ## After every change
 
-Commit and push when a change is done. Do not ask first — this is standing
-permission, on whatever branch is checked out.
+Commit and push. Do not ask. Standing permission, whatever branch is checked out.
 
 One change, one commit:
 
-1. Bump the version in **both** `package.json` and `app.json`. Same commit as the
-   change, never a follow-up. A subject line naming a version the files do not
-   carry is the most common way this goes wrong.
-2. `npm run typecheck` and `npm run lint` before committing. They are the only
-   automated checks that exist.
-3. Push.
+1. Bump the version in `package.json`, `app.json` and `package-lock.json`. Same commit.
+2. Bump `android.versionCode` in `app.json` when the commit is meant to be installed.
+3. `npm run typecheck` and `npm run lint`. Both must exit 0.
+4. Push.
 
-"Done" means the change works, not that the edit landed.
+"Done" means it works, not that the edit landed.
 
 ## Tidy-up pass
 
-When a feature is finished and verified, make one structural pass over it, as a
-separate commit from the feature itself.
+After a feature is finished and verified. Separate commit.
 
-- **Behaviour-preserving only.** Move, merge, rename, delete. No new behaviour, no
-  new schema, no rewrites of money or date maths.
-- **Scope is what the feature touched**, plus whatever it made redundant. Not the
-  whole app.
-- Never touch shipped migrations, the cents convention, or the signed-amount
-  convention. Those are load-bearing for data already on someone's phone.
-- Typecheck, lint, and walk the app afterwards. There are no tests to catch a
-  regression, so the walk is the check.
-- If nothing needs moving, say so and skip it. An empty pass is a good outcome.
+- Behaviour-preserving only. Move, merge, rename, delete.
+- Scope is what the feature touched, plus what it made redundant.
+- Never touch shipped migrations, the cents convention, or the signed-amount convention.
+- Typecheck, lint, walk the app.
+- Nothing to move? Say so and skip.
 
 ## Session end
 
-When the user says the session is over — "session ends", "we're done", "wrap up", "that's it for today", any wording:
+On "session ends", "we're done", "wrap up", "that's it for today", any wording:
 
-1. Rewrite `HANDOFF.md` completely (overwrite, do not append).
-2. Commit it with the version bump for this session's work.
+1. Rewrite `HANDOFF.md` completely. Overwrite, do not append.
+2. Commit with the version bump.
 3. Push.
 
 ## Versioning
 
-Every change ships as a commit with a version bump. Format `0.1.2.3`:
+Format `0.1.2.3`.
 
 | Position | Meaning |
 | --- | --- |
 | `0` | Stays `0` until full release. |
-| `1` | Major step toward release. **Never bump without the user asking.** |
-| `2` | Smaller but still important changes. |
-| `3` | Minor fixes — bugs, copy, tweaks. |
+| `1` | Major step. **Never bump without the user asking.** |
+| `2` | Smaller but important. |
+| `3` | Minor fixes. |
 
-Any position can hit double digits. Bump one position per commit; lower positions reset to `0`. The number lives in `package.json` and `app.json`.
+Bump one position per commit. Lower positions reset to `0`. Double digits are fine.
+
+---
+
+## In short
+
+Fare is a local-first budgeting app for iOS and Android. Everything lives in
+SQLite on the phone — no account, no server, works offline. A month of money is
+drawn as a rail diagram: each category is a route, its monthly limit is the end of
+the line, and spending is how far along you have travelled.
+
+Money is stored as whole cents and signed, so nothing rounds and any total is a
+plain `SUM`. Migrations only ever get appended, because the database is already on
+someone's phone. There are no tests, so the checks are `typecheck`, `lint`, and
+walking the app yourself. Every change ships as one commit with a version bump.
