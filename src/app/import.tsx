@@ -7,6 +7,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/button';
 import { EmptyState } from '@/components/empty-state';
+import { TextField } from '@/components/field';
 import { Money } from '@/components/money';
 import { Plate } from '@/components/plate';
 import { Screen } from '@/components/screen';
@@ -14,6 +15,11 @@ import { SheetHeader } from '@/components/sheet';
 import { Text } from '@/components/text';
 import { IconImport, IconTick } from '@/components/transit/icons';
 import { Line, Radius, Space, Stroke, TouchTarget } from '@/constants/theme';
+import {
+  findPresetForHeader,
+  headerSignature,
+  saveImportPreset,
+} from '@/db/repositories/import-presets';
 import { loadRuleMatcher } from '@/db/repositories/import-rules';
 import {
   bulkInsertImported,
@@ -54,6 +60,11 @@ export default function ImportScreen() {
   const [mapping, setMapping] = useState<Mapping | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  /** Name of the saved format that recognised this file, if one did. */
+  const [recognised, setRecognised] = useState<string | null>(null);
+  const [presetName, setPresetName] = useState('');
+  /** The mapping as it stood when the format was last saved, if it has been. */
+  const [savedMapping, setSavedMapping] = useState<string | null>(null);
   const [result, setResult] = useState<{
     inserted: number;
     skipped: number;
@@ -77,10 +88,30 @@ export default function ImportScreen() {
         setError('That file has a heading row but no transactions in it.');
         return;
       }
-      const guessed = guessColumns(parsed.header);
       setCsv(parsed);
       setFileName(asset.name);
       setResult(null);
+      setSavedMapping(null);
+
+      // A format saved from this bank's last export beats guessing at the
+      // headings, so it is applied without asking.
+      const preset = await findPresetForHeader(db, parsed.header);
+      if (preset) {
+        setRecognised(preset.name);
+        setPresetName(preset.name);
+        setMapping({
+          date: preset.date_column,
+          amount: preset.amount_column,
+          description: preset.description_column,
+          format: preset.date_format as DateFormat,
+          allNegative: preset.all_negative === 1,
+        });
+        return;
+      }
+
+      setRecognised(null);
+      setPresetName('');
+      const guessed = guessColumns(parsed.header);
       setMapping({
         ...guessed,
         format: guessDateFormat(parsed.rows.map((row) => row[guessed.date] ?? '')),
@@ -89,6 +120,30 @@ export default function ImportScreen() {
     } catch (readError) {
       setError(`Could not read that file. ${(readError as Error).message}`);
     }
+  }
+
+  // Derived rather than a flag reset by an effect: editing a column after saving
+  // makes the saved format out of date, and the button offers itself again.
+  const mappingKey = mapping ? JSON.stringify(mapping) : null;
+  const savedPreset = savedMapping !== null && savedMapping === mappingKey;
+
+  async function savePreset() {
+    if (!csv || !mapping) return;
+    const name = presetName.trim();
+    if (!name) return;
+
+    await saveImportPreset(db, {
+      name,
+      header_signature: headerSignature(csv.header),
+      date_column: mapping.date,
+      amount_column: mapping.amount,
+      description_column: mapping.description,
+      date_format: mapping.format,
+      all_negative: mapping.allNegative,
+    });
+    setSavedMapping(mappingKey);
+    setRecognised(name);
+    invalidate();
   }
 
   const preview = useMemo(() => {
@@ -162,6 +217,12 @@ export default function ImportScreen() {
                 </Text>
               </Pressable>
             </View>
+
+            {recognised ? (
+              <Text variant="caption" tone="muted" style={styles.groupLabel}>
+                {`Read as ${recognised}. The columns below came from the saved format — change any of them if the bank has moved something.`}
+              </Text>
+            ) : null}
 
             {mapping ? (
               <>
@@ -267,6 +328,33 @@ export default function ImportScreen() {
                     </Text>
                   ) : null}
                 </View>
+
+                {!result ? (
+                  <View style={styles.group}>
+                    <Text variant="station" tone="muted" style={styles.groupLabel}>
+                      Remember this format
+                    </Text>
+                    <TextField
+                      label="Name of the bank"
+                      value={presetName}
+                      onChangeText={setPresetName}
+                      placeholder="ING, Rabobank, Revolut…"
+                      hint="Next time a file with these headings is picked, the columns fill in on their own."
+                      autoCapitalize="words"
+                      autoCorrect={false}
+                      returnKeyType="done"
+                      style={styles.presetField}
+                    />
+                    <Button
+                      label={savedPreset ? 'Format saved' : 'Save this format'}
+                      variant="quiet"
+                      showArrow={false}
+                      disabled={presetName.trim().length === 0 || savedPreset}
+                      onPress={savePreset}
+                      style={styles.presetField}
+                    />
+                  </View>
+                ) : null}
               </>
             ) : null}
           </>
@@ -406,5 +494,8 @@ const styles = StyleSheet.create({
   },
   resultText: {
     flex: 1,
+  },
+  presetField: {
+    marginHorizontal: Space.lg,
   },
 });

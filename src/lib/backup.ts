@@ -20,6 +20,7 @@ const TABLES = [
   'transactions',
   'budgets',
   'import_rules',
+  'import_presets',
   'recurring_rules',
   'goals',
   'templates',

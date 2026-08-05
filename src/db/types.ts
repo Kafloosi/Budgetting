@@ -129,6 +129,24 @@ export interface Budget extends SyncableRecord {
   limit_cents: number;
 }
 
+/**
+ * A remembered statement format, so a bank's columns are mapped once.
+ *
+ * Column positions are indices into the CSV's rows. `header_signature` is the
+ * flattened heading row, used to recognise the same export next month.
+ */
+export interface ImportPreset extends SyncableRecord {
+  name: string;
+  header_signature: string | null;
+  date_column: number;
+  amount_column: number;
+  description_column: number;
+  /** One of `lib/csv`'s `DateFormat` values. */
+  date_format: string;
+  /** 1 when the bank exports every amount unsigned. */
+  all_negative: number;
+}
+
 /** How an import rule matches a bank description. */
 export type RuleMatchType = 'contains' | 'starts_with' | 'equals';
 

@@ -196,6 +196,44 @@ const MIGRATIONS: string[] = [
   UPDATE categories SET icon = ''
    WHERE id LIKE 'seed-%' AND deleted_at IS NULL;
   `,
+
+  // 6 — remembered statement formats
+  //
+  // A bank's export keeps the same columns every month, so saying which column is
+  // which should be a thing you do once per bank rather than once per file.
+  //
+  // `header_signature` is the flattened heading row. When a picked file's headings
+  // match a saved one, the mapping is applied without asking — which is the whole
+  // point, and why the signature is stored rather than recomputed from the column
+  // indices. It is nullable so a preset saved from a file with no usable headings
+  // can still be chosen by hand.
+  `
+  CREATE TABLE import_presets (
+    id                 TEXT PRIMARY KEY NOT NULL,
+    household_id       TEXT,
+    name               TEXT NOT NULL,
+    header_signature   TEXT,
+    date_column        INTEGER NOT NULL,
+    amount_column      INTEGER NOT NULL,
+    description_column INTEGER NOT NULL,
+    date_format        TEXT NOT NULL
+                       CHECK (date_format IN ('iso', 'dmy', 'mdy', 'compact')),
+    all_negative       INTEGER NOT NULL DEFAULT 0,
+    created_at         TEXT NOT NULL,
+    updated_at         TEXT NOT NULL,
+    deleted_at         TEXT
+  );
+
+  -- One preset per name, so re-saving "ING" updates rather than accumulating.
+  CREATE UNIQUE INDEX idx_import_presets_name
+    ON import_presets(name COLLATE NOCASE)
+    WHERE deleted_at IS NULL;
+
+  -- Looked up on every file pick.
+  CREATE INDEX idx_import_presets_signature
+    ON import_presets(header_signature)
+    WHERE deleted_at IS NULL AND header_signature IS NOT NULL;
+  `,
 ];
 
 /** Categories a new install starts with, so the app is usable immediately. */
