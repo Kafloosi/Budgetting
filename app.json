@@ -2,7 +2,7 @@
   "expo": {
     "name": "Fare",
     "slug": "Budgetting",
-    "version": "0.1.6.0",
+    "version": "0.1.6.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "fare",
@@ -13,7 +13,7 @@
     },
     "android": {
       "package": "com.kafloosi.fare",
-      "versionCode": 2,
+      "versionCode": 3,
       "adaptiveIcon": {
         "backgroundColor": "#0A1330",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
