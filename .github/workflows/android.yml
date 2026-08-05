@@ -52,24 +52,22 @@ jobs:
       # `keytool -list` asks the same question in two seconds.
       - name: Restore the signing keystore
         env:
-          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          # `PKCS12` is the name the keystore was first stored under. Secrets
+          # cannot be renamed, only recreated, and re-pasting a keystore to
+          # change a label is a good way to lose one — so both names work and
+          # the explicit one wins.
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 || secrets.PKCS12 }}
           STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           set -euo pipefail
 
-          # An unset secret is an empty string, not an error, so all four are
-          # named here. Reporting them together means one round trip to the
-          # settings page instead of four builds.
-          missing=""
-          [ -n "${KEYSTORE_BASE64//[[:space:]]/}" ] || missing="$missing ANDROID_KEYSTORE_BASE64"
-          [ -n "$STORE_PASSWORD" ]                  || missing="$missing ANDROID_KEYSTORE_PASSWORD"
-          [ -n "$KEY_ALIAS" ]                       || missing="$missing ANDROID_KEY_ALIAS"
-          [ -n "$KEY_PASSWORD" ]                    || missing="$missing ANDROID_KEY_PASSWORD"
-
-          if [ -n "$missing" ]; then
-            echo "::error::Signing secrets are not set:$missing — add them under Settings → Secrets and variables → Actions. The release section of README.md says what each one holds."
+          # The keystore is checked before the credentials are, so a run with
+          # half the secrets set still reports whether the keystore itself is
+          # sound. Knowing the file is good narrows the next fix to a password.
+          if [ -z "${KEYSTORE_BASE64//[[:space:]]/}" ]; then
+            echo "::error::Neither ANDROID_KEYSTORE_BASE64 nor PKCS12 is set. Add the base64 keystore under Settings → Secrets and variables → Actions; the release section of README.md has the encoding command."
             exit 1
           fi
 
@@ -78,7 +76,7 @@ jobs:
           printf '%s' "$KEYSTORE_BASE64" | tr -d '[:space:]' | base64 -d > android/app/release.keystore
 
           if [ ! -s android/app/release.keystore ]; then
-            echo "::error::The keystore decoded to an empty file. ANDROID_KEYSTORE_BASE64 is not valid base64."
+            echo "::error::The keystore secret decoded to an empty file — it is not valid base64."
             exit 1
           fi
 
@@ -90,9 +88,25 @@ jobs:
             exit 1
           fi
 
+          echo "Keystore decoded: $(wc -c < android/app/release.keystore) bytes, DER header present."
+
+          # An unset secret is an empty string, not an error, so the remaining
+          # three are named together — one round trip to the settings page
+          # instead of three builds.
+          missing=""
+          [ -n "$STORE_PASSWORD" ] || missing="$missing ANDROID_KEYSTORE_PASSWORD"
+          [ -n "$KEY_ALIAS" ]      || missing="$missing ANDROID_KEY_ALIAS"
+          [ -n "$KEY_PASSWORD" ]   || missing="$missing ANDROID_KEY_PASSWORD"
+
+          if [ -n "$missing" ]; then
+            rm -f android/app/release.keystore
+            echo "::error::The keystore is fine, but these secrets are not set:$missing — add them under Settings → Secrets and variables → Actions. For a PKCS12 keystore both passwords are the same value."
+            exit 1
+          fi
+
           if ! keytool -list -keystore android/app/release.keystore \
                        -storepass "$STORE_PASSWORD" -alias "$KEY_ALIAS" > /dev/null 2>keytool.err; then
-            echo "::error::The keystore, its password or its alias is wrong. keytool said:"
+            echo "::error::The keystore opened, but its password or alias is wrong. keytool said:"
             sed 's/^/  /' keytool.err
             rm -f keytool.err android/app/release.keystore
             exit 1

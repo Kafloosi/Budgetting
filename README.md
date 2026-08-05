@@ -161,7 +161,7 @@ It needs four repository secrets, set once:
 
 | Secret | What it is |
 | --- | --- |
-| `ANDROID_KEYSTORE_BASE64` | the release keystore, base64-encoded |
+| `ANDROID_KEYSTORE_BASE64` | the release keystore, base64-encoded (`PKCS12` is accepted as an older name for the same thing) |
 | `ANDROID_KEYSTORE_PASSWORD` | its store password |
 | `ANDROID_KEY_ALIAS` | the key alias inside it |
 | `ANDROID_KEY_PASSWORD` | that key's password |
@@ -207,11 +207,16 @@ All four secrets must exist, and the names must match exactly — an unset secre
 arrives at the workflow as an empty string rather than an error. From the CLI:
 
 ```bash
-gh secret set ANDROID_KEYSTORE_BASE64 < keystore.b64.txt
+gh secret set ANDROID_KEYSTORE_BASE64 < keystore.b64.txt   # or leave it as PKCS12
 gh secret set ANDROID_KEYSTORE_PASSWORD
 gh secret set ANDROID_KEY_ALIAS
 gh secret set ANDROID_KEY_PASSWORD
 ```
+
+For a PKCS12 keystore the store and key passwords are one value, so
+`ANDROID_KEYSTORE_PASSWORD` and `ANDROID_KEY_PASSWORD` get the same thing. The
+alias is whatever `-alias` said when the keystore was generated — `fare` if the
+command above was used verbatim.
 
 `gh secret list` shows what is set, never the values. If any are missing or
 wrong, the workflow now says which ones in its first two minutes, in the
