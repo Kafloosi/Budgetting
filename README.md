@@ -167,11 +167,17 @@ It needs four repository secrets, set once:
 Generate the keystore once and never replace it:
 
 ```bash
-keytool -genkeypair -v -keystore fare-release.jks -alias fare \
-        -keyalg RSA -keysize 2048 -validity 10000
+keytool -genkeypair -v -storetype PKCS12 -keystore fare-release.p12 \
+        -alias fare -keyalg RSA -keysize 2048 -validity 10000
 ```
 
-Keep the `.jks` outside the repository and backed up. Android will not install an
+`keytool` ships with any JDK or JRE; on Windows it is under
+`C:\Program Files\Java\<version>\bin\`. PKCS12 rather than the JKS default
+because JKS is deprecated, and PKCS12 uses one password for both the store and
+the key — so `ANDROID_KEYSTORE_PASSWORD` and `ANDROID_KEY_PASSWORD` hold the same
+value.
+
+Keep the `.p12` outside the repository and backed up. Android will not install an
 APK over one signed with a different key — the only way through is an uninstall,
 and an uninstall deletes the SQLite database, which is the entire ledger. For the
 same reason `android.package` is pinned in `app.json` and must not change.
