@@ -2,7 +2,7 @@
   "expo": {
     "name": "Fare",
     "slug": "Budgetting",
-    "version": "0.1.6.1",
+    "version": "0.1.7.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "fare",
@@ -41,7 +41,13 @@
         }
       ],
       "expo-sqlite",
-      "expo-sharing"
+      "expo-sharing",
+      [
+        "expo-notifications",
+        {
+          "color": "#E7002A"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

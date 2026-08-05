@@ -1,7 +1,7 @@
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 
 import { Button } from '@/components/button';
 import { Plate } from '@/components/plate';
@@ -20,10 +20,12 @@ import {
   IconTrash,
 } from '@/components/transit/icons';
 import { Elevation, Line, Radius, Space, Stroke, TouchTarget } from '@/constants/theme';
+import { WARNING_THRESHOLD } from '@/db/repositories/budgets';
 import type { AppearancePreference } from '@/db/repositories/settings';
 import { countUncategorised } from '@/db/repositories/transactions';
 import { CURRENCIES, type CurrencyOption } from '@/lib/currencies';
 import { formatMoney } from '@/lib/money';
+import { askToNotify } from '@/lib/notifications';
 import { canUseAppLock } from '@/providers/app-lock';
 import { useTheme } from '@/hooks/use-theme';
 import { useLedgerQuery } from '@/providers/ledger';
@@ -48,9 +50,34 @@ export default function SettingsScreen() {
   const [pickingCurrency, setPickingCurrency] = useState(false);
   const [lockAvailable, setLockAvailable] = useState(false);
 
+  const [alertsBlocked, setAlertsBlocked] = useState(false);
+
   // Only surfaced when there is a backlog — a row reading "0 to file" is noise.
   const uncategorised = useLedgerQuery((database) => countUncategorised(database), []);
   const waiting = uncategorised.data ?? 0;
+
+  /**
+   * Asks the OS only when switching on, and refuses to leave the toggle looking
+   * on when permission was not given — a switch that lies is worse than a switch
+   * that is disabled.
+   */
+  async function toggleAlerts(next: boolean) {
+    if (!next) {
+      update({ budgetAlerts: false });
+      return;
+    }
+    const allowed = await askToNotify();
+    if (!allowed) {
+      setAlertsBlocked(true);
+      Alert.alert(
+        'Fare cannot send notifications',
+        'Allow notifications for Fare in your phone’s settings, then turn this back on.',
+      );
+      return;
+    }
+    setAlertsBlocked(false);
+    update({ budgetAlerts: true });
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -159,6 +186,28 @@ export default function SettingsScreen() {
             icon={<IconTrash size={20} color={theme.inkMuted} />}
             onPress={() => router.push('/trash')}
           />
+        </View>
+
+        <View style={styles.section}>
+          <SectionLabel>Alerts</SectionLabel>
+          <View style={styles.toggleRow}>
+            <View style={styles.rowBody}>
+              <Text variant="body">Budget alerts</Text>
+              <Text variant="caption" tone="muted">
+                {alertsBlocked
+                  ? 'Turned off for Fare in your phone’s settings. Allow notifications there first.'
+                  : `Tell me when a category reaches ${Math.round(WARNING_THRESHOLD * 100)}% of its limit, and when it goes past. Checked when Fare opens.`}
+              </Text>
+            </View>
+            <Switch
+              value={settings.budgetAlerts}
+              onValueChange={toggleAlerts}
+              disabled={alertsBlocked}
+              trackColor={{ true: Line.green, false: theme.rule }}
+              thumbColor={theme.ink}
+              accessibilityLabel="Budget alerts"
+            />
+          </View>
         </View>
 
         <View style={styles.section}>

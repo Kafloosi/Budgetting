@@ -19,6 +19,8 @@ export interface Settings {
   appearance: AppearancePreference;
   /** Require the phone's own biometrics or passcode before the ledger opens. */
   appLock: boolean;
+  /** Notify when a category reaches 80% of its limit, and again when it passes it. */
+  budgetAlerts: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -27,6 +29,9 @@ export const DEFAULT_SETTINGS: Settings = {
   onboarded: false,
   appearance: 'system',
   appLock: false,
+  // Off until asked for. An app that notifies before being told to is an app
+  // whose notifications get turned off at the OS level, permanently.
+  budgetAlerts: false,
 };
 
 export async function loadSettings(db: SQLiteDatabase): Promise<Settings> {
@@ -43,6 +48,7 @@ export async function loadSettings(db: SQLiteDatabase): Promise<Settings> {
     appearance:
       appearance === 'enamel' || appearance === 'porcelain' ? appearance : DEFAULT_SETTINGS.appearance,
     appLock: stored.get('appLock') === '1',
+    budgetAlerts: stored.get('budgetAlerts') === '1',
   };
 }
 
@@ -59,5 +65,55 @@ export async function saveSettings(
          ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
       [key, typeof value === 'boolean' ? (value ? '1' : '0') : String(value), now],
     );
+  }
+}
+
+/**
+ * Which budget alerts have already been sent, so none is sent twice.
+ *
+ * Kept in the settings table rather than earning one of its own — a record of
+ * what has been said is not worth a migration. It does ride along in a backup,
+ * which is the behaviour you want: restoring a ledger should not re-announce a
+ * month you have already been told about.
+ *
+ * The key is `alerted:<category>:<month>:<threshold>`, so crossing 80% and then
+ * passing the limit are two separate events in the same month.
+ */
+const ALERT_PREFIX = 'alerted:';
+
+export async function listAlerted(db: SQLiteDatabase, month: string): Promise<Set<string>> {
+  const rows = await db.getAllAsync<{ key: string }>(
+    'SELECT key FROM settings WHERE key LIKE ?',
+    [`${ALERT_PREFIX}%:${month}:%`],
+  );
+  return new Set(rows.map((row) => row.key));
+}
+
+export function alertKey(categoryId: string, month: string, threshold: 'warning' | 'over'): string {
+  return `${ALERT_PREFIX}${categoryId}:${month}:${threshold}`;
+}
+
+export async function recordAlerted(db: SQLiteDatabase, key: string): Promise<void> {
+  await db.runAsync(
+    `INSERT INTO settings (key, value, updated_at) VALUES (?, '1', ?)
+       ON CONFLICT(key) DO UPDATE SET updated_at = excluded.updated_at`,
+    [key, nowIso()],
+  );
+}
+
+/**
+ * Drops the record for months that are over, so the settings table does not grow
+ * by a row per category per month forever.
+ */
+export async function pruneAlerted(db: SQLiteDatabase, keepMonth: string): Promise<void> {
+  const rows = await db.getAllAsync<{ key: string }>(
+    'SELECT key FROM settings WHERE key LIKE ?',
+    [`${ALERT_PREFIX}%`],
+  );
+  for (const { key } of rows) {
+    // alerted:<category>:<month>:<threshold> — the month is the second-to-last part.
+    const parts = key.split(':');
+    const month = parts[parts.length - 2];
+    if (month < keepMonth) await db.runAsync('DELETE FROM settings WHERE key = ?', [key]);
   }
 }
