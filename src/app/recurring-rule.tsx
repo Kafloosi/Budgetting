@@ -22,7 +22,7 @@ import {
   updateRecurring,
 } from '@/db/repositories/recurring';
 import type { Category, DateOnly, RecurringFrequency } from '@/db/types';
-import { toDateOnly } from '@/db/util';
+import { toDateOnly } from '@/lib/dates';
 import { haptics } from '@/lib/haptics';
 import { useTheme } from '@/hooks/use-theme';
 import { useInvalidateLedger, useLedgerQuery } from '@/providers/ledger';

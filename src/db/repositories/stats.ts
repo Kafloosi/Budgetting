@@ -1,7 +1,8 @@
+import { shiftMonth } from '@/lib/dates';
+
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 import type { MonthKey } from '../types';
-import { shiftMonth } from '../util';
 
 export interface MonthBar {
   month: MonthKey;

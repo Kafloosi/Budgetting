@@ -14,7 +14,7 @@ import { Keypad } from '@/components/transit/keypad';
 import { Line, LineOrder, Space, Stroke, TouchTarget } from '@/constants/theme';
 import { createGoal, deleteGoal, getGoal, updateGoal } from '@/db/repositories/goals';
 import type { DateOnly } from '@/db/types';
-import { shiftDaysByMonth, toDateOnly } from '@/db/util';
+import { shiftDaysByMonth, toDateOnly } from '@/lib/dates';
 import { haptics } from '@/lib/haptics';
 import { useTheme } from '@/hooks/use-theme';
 import { useInvalidateLedger, useLedgerQuery } from '@/providers/ledger';

@@ -1,7 +1,9 @@
+import { shiftDays, shiftDaysByMonth, toDateOnly } from '@/lib/dates';
+
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 import type { DateOnly, RecurringFrequency, RecurringRule } from '../types';
-import { newId, nowIso, shiftDays, shiftDaysByMonth, toDateOnly, withTransaction } from '../util';
+import { newId, nowIso, withTransaction } from '../util';
 
 /** A rule that has run every day since 2000 is a bug, not a schedule. */
 const MAX_CATCH_UP = 400;

@@ -14,7 +14,7 @@ import { Line, Space, Stroke } from '@/constants/theme';
 import { getBudgetProgress, getRecurringLimits } from '@/db/repositories/budgets';
 import { listCategories } from '@/db/repositories/categories';
 import { getCategorySpend, listMonthsWithData } from '@/db/repositories/transactions';
-import { toMonthKey } from '@/db/util';
+import { toMonthKey } from '@/lib/dates';
 import { useTheme } from '@/hooks/use-theme';
 import { useLedgerQuery } from '@/providers/ledger';
 import { useMoney } from '@/providers/settings';

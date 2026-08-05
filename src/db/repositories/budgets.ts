@@ -1,7 +1,9 @@
+import { monthBounds } from '@/lib/dates';
+
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 import type { MonthKey } from '../types';
-import { monthBounds, newId, nowIso } from '../util';
+import { newId, nowIso } from '../util';
 
 /** Fraction of the limit at which a category starts warning. */
 export const WARNING_THRESHOLD = 0.8;

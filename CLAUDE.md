@@ -6,6 +6,22 @@ Local-first budgeting app, iOS + Android. v1 UI is built.
 
 Read first: `HANDOFF.md` (where we left off) · `DESIGN.md` (before any visual change) · `PRODUCT.md` (who it is for) · `README.md` (how it works).
 
+## Session start
+
+Open every session with ten things worth doing next. Before the greeting, before
+any question back.
+
+- Read `HANDOFF.md` and the `README.md` feature table first. The list is drawn
+  from the repo as it actually is, not from memory of it.
+- Ten lines, ranked, best first. One line each: what it is, and why it is worth
+  doing — the second half is the part that earns its place.
+- Mix scales. Features, gaps, bugs, papercuts, store readiness. A list of ten
+  features is a worse list.
+- Prefer what the code proves. A table that ships with no UI, a screen that ends
+  in a dead end, a `README.md` next step that never happened — these beat ideas.
+- Never invent work to reach ten. Say so and stop short.
+- Then wait. The list is an offer, not a plan.
+
 ## Commands
 
 ```bash
@@ -48,6 +64,37 @@ Use the installed skills instead of winging it.
 - `/impeccable` — any UI, visual, or design work. `PRODUCT.md` and `DESIGN.md` are its records.
 - `expo:*` — Expo APIs, router, EAS builds and updates.
 - `superpowers:brainstorming` before building something new; `superpowers:systematic-debugging` on a bug.
+
+## After every change
+
+Commit and push when a change is done. Do not ask first — this is standing
+permission, on whatever branch is checked out.
+
+One change, one commit:
+
+1. Bump the version in **both** `package.json` and `app.json`. Same commit as the
+   change, never a follow-up. A subject line naming a version the files do not
+   carry is the most common way this goes wrong.
+2. `npm run typecheck` and `npm run lint` before committing. They are the only
+   automated checks that exist.
+3. Push.
+
+"Done" means the change works, not that the edit landed.
+
+## Tidy-up pass
+
+When a feature is finished and verified, make one structural pass over it, as a
+separate commit from the feature itself.
+
+- **Behaviour-preserving only.** Move, merge, rename, delete. No new behaviour, no
+  new schema, no rewrites of money or date maths.
+- **Scope is what the feature touched**, plus whatever it made redundant. Not the
+  whole app.
+- Never touch shipped migrations, the cents convention, or the signed-amount
+  convention. Those are load-bearing for data already on someone's phone.
+- Typecheck, lint, and walk the app afterwards. There are no tests to catch a
+  regression, so the walk is the check.
+- If nothing needs moving, say so and skip it. An empty pass is a good outcome.
 
 ## Session end
 

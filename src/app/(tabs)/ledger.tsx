@@ -26,7 +26,7 @@ import {
   listTransactions,
   type TransactionWithCategory,
 } from '@/db/repositories/transactions';
-import { toMonthKey } from '@/db/util';
+import { toMonthKey } from '@/lib/dates';
 import { haptics } from '@/lib/haptics';
 import { useTheme } from '@/hooks/use-theme';
 import { useInvalidateLedger, useLedgerQuery } from '@/providers/ledger';

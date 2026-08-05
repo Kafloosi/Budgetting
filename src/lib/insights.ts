@@ -8,7 +8,7 @@
 
 import type { CategorySpend, MonthTotals } from '@/db/repositories/transactions';
 import type { MonthKey } from '@/db/types';
-import { formatMonthLabel } from '@/db/util';
+import { formatMonthLabel } from '@/lib/dates';
 
 export interface Insight {
   /** Stable key for lists, and for the bullet's colour. */

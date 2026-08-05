@@ -1,0 +1,173 @@
+# Builds an installable, signed Android APK.
+#
+# `/android` is gitignored — this is a managed Expo project — so every run
+# regenerates it with `expo prebuild`. That is why the signing configuration is
+# passed to Gradle as injected properties rather than written into
+# `android/app/build.gradle`: any edit there would be wiped by the next prebuild.
+#
+# The keystore must stay the same forever. Android refuses to install an APK over
+# one signed with a different key, and the only way through is an uninstall, which
+# deletes the app's SQLite database — the whole ledger.
+
+name: Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      # React Native 0.86 builds on JDK 17. The action major is a separate thing
+      # from the JDK it installs — v5 runs on Node 24, which is what the runner
+      # now requires; `java-version` still pins the toolchain to 17.
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - run: npm ci
+
+      # --no-install because npm ci has already done it.
+      - name: Generate the native project
+        run: npx expo prebuild --platform android --no-install
+
+      # Decoding and checking are one step on purpose. Gradle only reads the
+      # keystore in `:app:packageRelease`, the very last task, so a bad secret
+      # used to surface as an 18-minute build ending in a DER parse error.
+      # `keytool -list` asks the same question in two seconds.
+      - name: Restore the signing keystore
+        env:
+          # `PKCS12` is the name the keystore was first stored under. Secrets
+          # cannot be renamed, only recreated, and re-pasting a keystore to
+          # change a label is a good way to lose one — so both names work and
+          # the explicit one wins.
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 || secrets.PKCS12 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          # The keystore is checked before the credentials are, so a run with
+          # half the secrets set still reports whether the keystore itself is
+          # sound. Knowing the file is good narrows the next fix to a password.
+          if [ -z "${KEYSTORE_BASE64//[[:space:]]/}" ]; then
+            echo "::error::Neither ANDROID_KEYSTORE_BASE64 nor PKCS12 is set. Add the base64 keystore under Settings → Secrets and variables → Actions; the release section of README.md has the encoding command."
+            exit 1
+          fi
+
+          # `tr -d` strips the CR and line wrapping that Windows and openssl add.
+          # printf rather than echo, which would eat a leading dash.
+          # The `if !` matters: under `set -e` a bare pipeline would abort the
+          # step on `base64: invalid input` alone, which says nothing about
+          # which secret or what to do about it.
+          if ! printf '%s' "$KEYSTORE_BASE64" | tr -d '[:space:]' \
+               | base64 -d > android/app/release.keystore 2>base64.err; then
+            echo "::error::The keystore secret is not valid base64 — base64 said: $(tr -d '\n' < base64.err). This is what a .p12 read as text, a PEM-wrapped blob, or certutil -encode output looks like. Re-encode the raw bytes; the release section of README.md has the command for each shell."
+            rm -f base64.err android/app/release.keystore
+            exit 1
+          fi
+          rm -f base64.err
+
+          if [ ! -s android/app/release.keystore ]; then
+            echo "::error::The keystore secret decoded to an empty file."
+            exit 1
+          fi
+
+          # A PKCS12 keystore is DER, so it starts with a SEQUENCE tag, 0x30.
+          # Anything else means the bytes that were encoded were already corrupt
+          # — reading the .p12 as text is the usual way that happens.
+          if [ "$(head -c1 android/app/release.keystore | od -An -tx1 | tr -d ' ')" != "30" ]; then
+            echo "::error::The decoded keystore is not a PKCS12/JKS file. Re-encode it as raw bytes — see the release section of README.md."
+            exit 1
+          fi
+
+          echo "Keystore decoded: $(wc -c < android/app/release.keystore) bytes, DER header present."
+
+          # An unset secret is an empty string, not an error, so the remaining
+          # three are named together — one round trip to the settings page
+          # instead of three builds.
+          missing=""
+          [ -n "$STORE_PASSWORD" ] || missing="$missing ANDROID_KEYSTORE_PASSWORD"
+          [ -n "$KEY_ALIAS" ]      || missing="$missing ANDROID_KEY_ALIAS"
+          [ -n "$KEY_PASSWORD" ]   || missing="$missing ANDROID_KEY_PASSWORD"
+
+          if [ -n "$missing" ]; then
+            rm -f android/app/release.keystore
+            echo "::error::The keystore is fine, but these secrets are not set:$missing — add them under Settings → Secrets and variables → Actions. For a PKCS12 keystore both passwords are the same value."
+            exit 1
+          fi
+
+          if ! keytool -list -keystore android/app/release.keystore \
+                       -storepass "$STORE_PASSWORD" -alias "$KEY_ALIAS" > /dev/null 2>keytool.err; then
+            echo "::error::The keystore opened, but its password or alias is wrong. keytool said:"
+            sed 's/^/  /' keytool.err
+            rm -f keytool.err android/app/release.keystore
+            exit 1
+          fi
+
+          rm -f keytool.err
+          echo "Keystore restored and alias '$KEY_ALIAS' verified."
+
+      - name: Assemble the release APK
+        working-directory: android
+        env:
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          ./gradlew assembleRelease \
+            -Pandroid.injected.signing.store.file="$PWD/app/release.keystore" \
+            -Pandroid.injected.signing.store.password="$STORE_PASSWORD" \
+            -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
+            -Pandroid.injected.signing.key.password="$KEY_PASSWORD"
+
+      # The keystore is only needed for the line above. Removing it here keeps it
+      # out of anything a later step might archive.
+      - name: Remove the keystore
+        if: always()
+        run: rm -f android/app/release.keystore
+
+      # An APK that skipped the JS bundle step still builds, still installs, and
+      # crashes on launch. Native libraries dominate the file size, so size proves
+      # nothing — look inside for the bundle itself.
+      - name: Check the JS bundle made it into the APK
+        run: |
+          APK=android/app/build/outputs/apk/release/app-release.apk
+          ls -lh "$APK"
+          unzip -l "$APK" | grep -q 'assets/index.android.bundle'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-release-apk
+          path: android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+
+      - name: Publish the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: android/app/build/outputs/apk/release/app-release.apk
+          body: |
+            Fare ${{ github.ref_name }} — Android.
+
+            Download `app-release.apk` and open it on the phone. Android will ask
+            once for permission to install from your browser or file manager.
+
+            Installing over an earlier Fare keeps your ledger. Uninstalling deletes
+            it — export a backup from Settings first if you need to start clean.

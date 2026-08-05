@@ -27,7 +27,7 @@ import {
   updateTransaction,
 } from '@/db/repositories/transactions';
 import type { Category, DateOnly } from '@/db/types';
-import { toDateOnly } from '@/db/util';
+import { toDateOnly } from '@/lib/dates';
 import { haptics } from '@/lib/haptics';
 import { useTheme } from '@/hooks/use-theme';
 import { useInvalidateLedger, useLedgerQuery } from '@/providers/ledger';

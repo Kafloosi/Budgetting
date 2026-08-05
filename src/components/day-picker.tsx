@@ -6,7 +6,7 @@ import { Text } from '@/components/text';
 import { IconArrow, IconBack } from '@/components/transit/icons';
 import { Elevation, Radius, Space, Stroke, TouchTarget } from '@/constants/theme';
 import type { DateOnly } from '@/db/types';
-import { toDateOnly } from '@/db/util';
+import { toDateOnly } from '@/lib/dates';
 import { useTheme } from '@/hooks/use-theme';
 import { useMoney } from '@/providers/settings';
 

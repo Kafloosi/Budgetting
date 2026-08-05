@@ -83,10 +83,12 @@ src/
   db/
     types.ts            domain types
     migrations.ts       schema + migration runner (append-only)
-    util.ts             ids, timestamps, month and day maths, import hashing
+    util.ts             ids, timestamps, transactions
+    hash.ts             import fingerprinting, description normalising
     repositories/       the only place SQL lives
   lib/
     money.ts            cents <-> display strings, input parsing
+    dates.ts            month and day maths
     csv.ts, backup.ts, forecast.ts, insights.ts, currencies.ts, haptics.ts
 scripts/
   make-icons.mjs        the roundel, as app icon and splash
@@ -148,6 +150,85 @@ The loop worth walking after any change to the ledger: first run → log an expe
 on the keypad → it appears on Month and in the Ledger → put a limit on its
 category → watch the route cross under, warning and over → import a CSV twice and
 confirm the second import inserts nothing.
+
+## Installable builds
+
+`.github/workflows/android.yml` builds a signed APK on GitHub's runners — pushing
+a `v*` tag publishes it as a Release asset, and the workflow can also be run by
+hand from the Actions tab. There is no iOS equivalent; that needs macOS or EAS.
+
+It needs four repository secrets, set once:
+
+| Secret | What it is |
+| --- | --- |
+| `ANDROID_KEYSTORE_BASE64` | the release keystore, base64-encoded (`PKCS12` is accepted as an older name for the same thing) |
+| `ANDROID_KEYSTORE_PASSWORD` | its store password |
+| `ANDROID_KEY_ALIAS` | the key alias inside it |
+| `ANDROID_KEY_PASSWORD` | that key's password |
+
+Generate the keystore once and never replace it:
+
+```bash
+keytool -genkeypair -v -storetype PKCS12 -keystore fare-release.p12 \
+        -alias fare -keyalg RSA -keysize 2048 -validity 10000
+```
+
+`keytool` ships with any JDK or JRE; on Windows it is under
+`C:\Program Files\Java\<version>\bin\`. PKCS12 rather than the JKS default
+because JKS is deprecated, and PKCS12 uses one password for both the store and
+the key — so `ANDROID_KEYSTORE_PASSWORD` and `ANDROID_KEY_PASSWORD` hold the same
+value.
+
+Then encode it for `ANDROID_KEYSTORE_BASE64`. A `.p12` is binary, and the failure
+mode if it is read as text is silent: the encoding succeeds, the secret looks
+plausible, the workflow decodes it without complaint, and Gradle dies eighteen
+minutes later on `Tag number over 30 is not supported`. Read the bytes.
+
+```powershell
+# Windows PowerShell 5.1 — -Encoding Byte is what keeps it binary
+[Convert]::ToBase64String((Get-Content fare-release.p12 -Encoding Byte -Raw)) | Set-Clipboard
+```
+
+```powershell
+# PowerShell 7+ renamed it; -Encoding Byte is gone
+[Convert]::ToBase64String((Get-Content fare-release.p12 -AsByteStream -Raw)) | Set-Clipboard
+```
+
+```bash
+# macOS and Linux
+base64 -w0 fare-release.p12
+```
+
+Paste the whole single line into the secret. `certutil -encode` is not a
+substitute — it wraps the output in `-----BEGIN CERTIFICATE-----` lines that are
+not part of the data.
+
+All four secrets must exist, and the names must match exactly — an unset secret
+arrives at the workflow as an empty string rather than an error. From the CLI:
+
+```bash
+gh secret set ANDROID_KEYSTORE_BASE64 < keystore.b64.txt   # or leave it as PKCS12
+gh secret set ANDROID_KEYSTORE_PASSWORD
+gh secret set ANDROID_KEY_ALIAS
+gh secret set ANDROID_KEY_PASSWORD
+```
+
+For a PKCS12 keystore the store and key passwords are one value, so
+`ANDROID_KEYSTORE_PASSWORD` and `ANDROID_KEY_PASSWORD` get the same thing. The
+alias is whatever `-alias` said when the keystore was generated — `fare` if the
+command above was used verbatim.
+
+`gh secret list` shows what is set, never the values. If any are missing or
+wrong, the workflow now says which ones in its first two minutes, in the
+"Restore the signing keystore" step, rather than after a full Gradle build.
+
+Keep the `.p12` outside the repository and backed up. Android will not install an
+APK over one signed with a different key — the only way through is an uninstall,
+and an uninstall deletes the SQLite database, which is the entire ledger. For the
+same reason `android.package` is pinned in `app.json` and must not change.
+
+Bump `android.versionCode` for each release you intend to install over an earlier
+one. Reinstalling at the same code is fine; only downgrades are refused.
 
 ## Next steps
 

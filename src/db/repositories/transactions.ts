@@ -1,7 +1,9 @@
+import { monthBounds } from '@/lib/dates';
+
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 import type { DateOnly, MonthKey, Transaction, TransactionSource } from '../types';
-import { monthBounds, newId, nowIso, withTransaction } from '../util';
+import { newId, nowIso, withTransaction } from '../util';
 
 export interface TransactionInput {
   /** Signed cents: negative for spending, positive for income. */
