@@ -201,9 +201,21 @@ base64 -w0 fare-release.p12
 
 Paste the whole single line into the secret. `certutil -encode` is not a
 substitute — it wraps the output in `-----BEGIN CERTIFICATE-----` lines that are
-not part of the data. If the secret is wrong the workflow now says so in its
-first two minutes, in the "Restore the signing keystore" step, rather than at the
-end of the Gradle build.
+not part of the data.
+
+All four secrets must exist, and the names must match exactly — an unset secret
+arrives at the workflow as an empty string rather than an error. From the CLI:
+
+```bash
+gh secret set ANDROID_KEYSTORE_BASE64 < keystore.b64.txt
+gh secret set ANDROID_KEYSTORE_PASSWORD
+gh secret set ANDROID_KEY_ALIAS
+gh secret set ANDROID_KEY_PASSWORD
+```
+
+`gh secret list` shows what is set, never the values. If any are missing or
+wrong, the workflow now says which ones in its first two minutes, in the
+"Restore the signing keystore" step, rather than after a full Gradle build.
 
 Keep the `.p12` outside the repository and backed up. Android will not install an
 APK over one signed with a different key — the only way through is an uninstall,

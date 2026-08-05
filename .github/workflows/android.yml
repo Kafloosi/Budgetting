@@ -55,11 +55,21 @@ jobs:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           set -euo pipefail
 
-          if [ -z "${KEYSTORE_BASE64//[[:space:]]/}" ]; then
-            echo "::error::ANDROID_KEYSTORE_BASE64 is empty. Set it in Settings → Secrets and variables → Actions."
+          # An unset secret is an empty string, not an error, so all four are
+          # named here. Reporting them together means one round trip to the
+          # settings page instead of four builds.
+          missing=""
+          [ -n "${KEYSTORE_BASE64//[[:space:]]/}" ] || missing="$missing ANDROID_KEYSTORE_BASE64"
+          [ -n "$STORE_PASSWORD" ]                  || missing="$missing ANDROID_KEYSTORE_PASSWORD"
+          [ -n "$KEY_ALIAS" ]                       || missing="$missing ANDROID_KEY_ALIAS"
+          [ -n "$KEY_PASSWORD" ]                    || missing="$missing ANDROID_KEY_PASSWORD"
+
+          if [ -n "$missing" ]; then
+            echo "::error::Signing secrets are not set:$missing — add them under Settings → Secrets and variables → Actions. The release section of README.md says what each one holds."
             exit 1
           fi
 
