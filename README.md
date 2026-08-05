@@ -161,7 +161,7 @@ It needs four repository secrets, set once:
 
 | Secret | What it is |
 | --- | --- |
-| `ANDROID_KEYSTORE_BASE64` | the release keystore, base64-encoded |
+| `ANDROID_KEYSTORE_BASE64` | the release keystore, base64-encoded (`PKCS12` is accepted as an older name for the same thing) |
 | `ANDROID_KEYSTORE_PASSWORD` | its store password |
 | `ANDROID_KEY_ALIAS` | the key alias inside it |
 | `ANDROID_KEY_PASSWORD` | that key's password |
@@ -178,6 +178,49 @@ keytool -genkeypair -v -storetype PKCS12 -keystore fare-release.p12 \
 because JKS is deprecated, and PKCS12 uses one password for both the store and
 the key — so `ANDROID_KEYSTORE_PASSWORD` and `ANDROID_KEY_PASSWORD` hold the same
 value.
+
+Then encode it for `ANDROID_KEYSTORE_BASE64`. A `.p12` is binary, and the failure
+mode if it is read as text is silent: the encoding succeeds, the secret looks
+plausible, the workflow decodes it without complaint, and Gradle dies eighteen
+minutes later on `Tag number over 30 is not supported`. Read the bytes.
+
+```powershell
+# Windows PowerShell 5.1 — -Encoding Byte is what keeps it binary
+[Convert]::ToBase64String((Get-Content fare-release.p12 -Encoding Byte -Raw)) | Set-Clipboard
+```
+
+```powershell
+# PowerShell 7+ renamed it; -Encoding Byte is gone
+[Convert]::ToBase64String((Get-Content fare-release.p12 -AsByteStream -Raw)) | Set-Clipboard
+```
+
+```bash
+# macOS and Linux
+base64 -w0 fare-release.p12
+```
+
+Paste the whole single line into the secret. `certutil -encode` is not a
+substitute — it wraps the output in `-----BEGIN CERTIFICATE-----` lines that are
+not part of the data.
+
+All four secrets must exist, and the names must match exactly — an unset secret
+arrives at the workflow as an empty string rather than an error. From the CLI:
+
+```bash
+gh secret set ANDROID_KEYSTORE_BASE64 < keystore.b64.txt   # or leave it as PKCS12
+gh secret set ANDROID_KEYSTORE_PASSWORD
+gh secret set ANDROID_KEY_ALIAS
+gh secret set ANDROID_KEY_PASSWORD
+```
+
+For a PKCS12 keystore the store and key passwords are one value, so
+`ANDROID_KEYSTORE_PASSWORD` and `ANDROID_KEY_PASSWORD` get the same thing. The
+alias is whatever `-alias` said when the keystore was generated — `fare` if the
+command above was used verbatim.
+
+`gh secret list` shows what is set, never the values. If any are missing or
+wrong, the workflow now says which ones in its first two minutes, in the
+"Restore the signing keystore" step, rather than after a full Gradle build.
 
 Keep the `.p12` outside the repository and backed up. Android will not install an
 APK over one signed with a different key — the only way through is an uninstall,
