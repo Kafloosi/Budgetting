@@ -179,6 +179,32 @@ because JKS is deprecated, and PKCS12 uses one password for both the store and
 the key — so `ANDROID_KEYSTORE_PASSWORD` and `ANDROID_KEY_PASSWORD` hold the same
 value.
 
+Then encode it for `ANDROID_KEYSTORE_BASE64`. A `.p12` is binary, and the failure
+mode if it is read as text is silent: the encoding succeeds, the secret looks
+plausible, the workflow decodes it without complaint, and Gradle dies eighteen
+minutes later on `Tag number over 30 is not supported`. Read the bytes.
+
+```powershell
+# Windows PowerShell 5.1 — -Encoding Byte is what keeps it binary
+[Convert]::ToBase64String((Get-Content fare-release.p12 -Encoding Byte -Raw)) | Set-Clipboard
+```
+
+```powershell
+# PowerShell 7+ renamed it; -Encoding Byte is gone
+[Convert]::ToBase64String((Get-Content fare-release.p12 -AsByteStream -Raw)) | Set-Clipboard
+```
+
+```bash
+# macOS and Linux
+base64 -w0 fare-release.p12
+```
+
+Paste the whole single line into the secret. `certutil -encode` is not a
+substitute — it wraps the output in `-----BEGIN CERTIFICATE-----` lines that are
+not part of the data. If the secret is wrong the workflow now says so in its
+first two minutes, in the "Restore the signing keystore" step, rather than at the
+end of the Gradle build.
+
 Keep the `.p12` outside the repository and backed up. Android will not install an
 APK over one signed with a different key — the only way through is an uninstall,
 and an uninstall deletes the SQLite database, which is the entire ledger. For the
