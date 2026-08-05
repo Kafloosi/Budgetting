@@ -65,6 +65,37 @@ Use the installed skills instead of winging it.
 - `expo:*` — Expo APIs, router, EAS builds and updates.
 - `superpowers:brainstorming` before building something new; `superpowers:systematic-debugging` on a bug.
 
+## After every change
+
+Commit and push when a change is done. Do not ask first — this is standing
+permission, on whatever branch is checked out.
+
+One change, one commit:
+
+1. Bump the version in **both** `package.json` and `app.json`. Same commit as the
+   change, never a follow-up. A subject line naming a version the files do not
+   carry is the most common way this goes wrong.
+2. `npm run typecheck` and `npm run lint` before committing. They are the only
+   automated checks that exist.
+3. Push.
+
+"Done" means the change works, not that the edit landed.
+
+## Tidy-up pass
+
+When a feature is finished and verified, make one structural pass over it, as a
+separate commit from the feature itself.
+
+- **Behaviour-preserving only.** Move, merge, rename, delete. No new behaviour, no
+  new schema, no rewrites of money or date maths.
+- **Scope is what the feature touched**, plus whatever it made redundant. Not the
+  whole app.
+- Never touch shipped migrations, the cents convention, or the signed-amount
+  convention. Those are load-bearing for data already on someone's phone.
+- Typecheck, lint, and walk the app afterwards. There are no tests to catch a
+  regression, so the walk is the check.
+- If nothing needs moving, say so and skip it. An empty pass is a good outcome.
+
 ## Session end
 
 When the user says the session is over — "session ends", "we're done", "wrap up", "that's it for today", any wording:
