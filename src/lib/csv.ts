@@ -8,6 +8,8 @@
  * redesigns their export.
  */
 
+import { parseMoneyToCents } from '@/lib/money';
+
 export interface ParsedCsv {
   header: string[];
   rows: string[][];
@@ -193,5 +195,38 @@ export function guessColumns(header: string[]): {
     date: Math.max(0, find(/date|datum|boekdatum|transactiedatum/)),
     amount: Math.max(0, find(/amount|bedrag|value|mutatie/)),
     description: Math.max(0, find(/description|omschrijving|naam|name|payee|mededeling|memo/)),
+  };
+}
+
+/** Which column is which, once the guess has been confirmed or corrected. */
+export interface Mapping {
+  date: number;
+  amount: number;
+  description: number;
+  format: DateFormat;
+  /** Some banks export every amount unsigned and put the direction elsewhere. */
+  allNegative: boolean;
+}
+
+/** One statement row read through a mapping, ready to become a transaction. */
+export interface Draft {
+  date: string;
+  amount_cents: number;
+  description: string;
+}
+
+/**
+ * Reads one row. Null when it is not a transaction — a heading repeated
+ * mid-file, a balance line, a blank. The import screen counts those and says how
+ * many it skipped rather than failing the whole file for one bad row.
+ */
+export function toDraft(row: string[], mapping: Mapping): Draft | null {
+  const date = parseDate(row[mapping.date] ?? '', mapping.format);
+  const cents = parseMoneyToCents(row[mapping.amount] ?? '');
+  if (!date || cents === null || cents === 0) return null;
+  return {
+    date,
+    amount_cents: mapping.allNegative ? -Math.abs(cents) : cents,
+    description: (row[mapping.description] ?? '').replace(/\s+/g, ' ').trim(),
   };
 }

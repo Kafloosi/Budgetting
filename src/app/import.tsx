@@ -21,22 +21,14 @@ import {
   guessColumns,
   guessDateFormat,
   parseCsv,
-  parseDate,
+  toDraft,
   type DateFormat,
+  type Draft,
+  type Mapping,
   type ParsedCsv,
 } from '@/lib/csv';
-import { parseMoneyToCents } from '@/lib/money';
 import { useTheme } from '@/hooks/use-theme';
 import { useInvalidateLedger } from '@/providers/ledger';
-
-interface Mapping {
-  date: number;
-  amount: number;
-  description: number;
-  format: DateFormat;
-  /** Some banks export every amount unsigned and put the direction elsewhere. */
-  allNegative: boolean;
-}
 
 /**
  * Reading a bank statement in.
@@ -298,23 +290,6 @@ export default function ImportScreen() {
       </ScrollView>
     </Screen>
   );
-}
-
-interface Draft {
-  date: string;
-  amount_cents: number;
-  description: string;
-}
-
-function toDraft(row: string[], mapping: Mapping): Draft | null {
-  const date = parseDate(row[mapping.date] ?? '', mapping.format);
-  const cents = parseMoneyToCents(row[mapping.amount] ?? '');
-  if (!date || cents === null || cents === 0) return null;
-  return {
-    date,
-    amount_cents: mapping.allNegative ? -Math.abs(cents) : cents,
-    description: (row[mapping.description] ?? '').replace(/\s+/g, ' ').trim(),
-  };
 }
 
 function ColumnPicker({
