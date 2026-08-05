@@ -149,6 +149,36 @@ on the keypad → it appears on Month and in the Ledger → put a limit on its
 category → watch the route cross under, warning and over → import a CSV twice and
 confirm the second import inserts nothing.
 
+## Installable builds
+
+`.github/workflows/android.yml` builds a signed APK on GitHub's runners — pushing
+a `v*` tag publishes it as a Release asset, and the workflow can also be run by
+hand from the Actions tab. There is no iOS equivalent; that needs macOS or EAS.
+
+It needs four repository secrets, set once:
+
+| Secret | What it is |
+| --- | --- |
+| `ANDROID_KEYSTORE_BASE64` | the release keystore, base64-encoded |
+| `ANDROID_KEYSTORE_PASSWORD` | its store password |
+| `ANDROID_KEY_ALIAS` | the key alias inside it |
+| `ANDROID_KEY_PASSWORD` | that key's password |
+
+Generate the keystore once and never replace it:
+
+```bash
+keytool -genkeypair -v -keystore fare-release.jks -alias fare \
+        -keyalg RSA -keysize 2048 -validity 10000
+```
+
+Keep the `.jks` outside the repository and backed up. Android will not install an
+APK over one signed with a different key — the only way through is an uninstall,
+and an uninstall deletes the SQLite database, which is the entire ledger. For the
+same reason `android.package` is pinned in `app.json` and must not change.
+
+Bump `android.versionCode` for each release you intend to install over an earlier
+one. Reinstalling at the same code is fine; only downgrades are refused.
+
 ## Next steps
 
 1. Budget alert notifications at 80% and over.
