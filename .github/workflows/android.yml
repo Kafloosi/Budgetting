@@ -73,10 +73,19 @@ jobs:
 
           # `tr -d` strips the CR and line wrapping that Windows and openssl add.
           # printf rather than echo, which would eat a leading dash.
-          printf '%s' "$KEYSTORE_BASE64" | tr -d '[:space:]' | base64 -d > android/app/release.keystore
+          # The `if !` matters: under `set -e` a bare pipeline would abort the
+          # step on `base64: invalid input` alone, which says nothing about
+          # which secret or what to do about it.
+          if ! printf '%s' "$KEYSTORE_BASE64" | tr -d '[:space:]' \
+               | base64 -d > android/app/release.keystore 2>base64.err; then
+            echo "::error::The keystore secret is not valid base64 — base64 said: $(tr -d '\n' < base64.err). This is what a .p12 read as text, a PEM-wrapped blob, or certutil -encode output looks like. Re-encode the raw bytes; the release section of README.md has the command for each shell."
+            rm -f base64.err android/app/release.keystore
+            exit 1
+          fi
+          rm -f base64.err
 
           if [ ! -s android/app/release.keystore ]; then
-            echo "::error::The keystore secret decoded to an empty file — it is not valid base64."
+            echo "::error::The keystore secret decoded to an empty file."
             exit 1
           fi
 
