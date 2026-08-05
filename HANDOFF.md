@@ -1,116 +1,149 @@
 # Handoff
 
-Updated: 2026-08-05 · version 0.1.2.6
+Updated: 2026-08-05 · version 0.1.2.11
 
 ## Read this first
 
-**Nothing from this session is on `main`.** Eight commits sit on
-`worktree-android-release-build`; `main` is still at `351ac17`. Open the PR before
-anything else:
+**The Android build works.** A signed APK now builds end to end:
+https://github.com/Kafloosi/Budgetting/actions/runs/31027616779 — `BUILD
+SUCCESSFUL in 23m 29s`, JS bundle verified inside, 54.1 MB artifact.
 
-https://github.com/Kafloosi/Budgetting/pull/new/worktree-android-release-build
+**Nothing is merged.** Two open draft PRs, neither on `main`:
+
+| PR | Branch | Into | What |
+| --- | --- | --- | --- |
+| [#2](https://github.com/Kafloosi/Budgetting/pull/2) | `fix-apk-signing` | `worktree-android-release-build` | the build fix, `0.1.2.11` |
+| [#1](https://github.com/Kafloosi/Budgetting/pull/1) | `audit-fixes` | `main` | CSV import bugs, `0.1.1.6` |
+
+`main` is still at `351ac17` (`0.1.1.5`) and has no `.github/` at all.
 
 ## Where we left off
 
-Three strands, in the order they happened.
+### 1. The APK build — fixed
 
-### 1. A downloadable Android build — started, **not working**
+The previous handoff said "the four repository secrets are set and confirmed
+working". **They were not.** `gh secret list` returned exactly one secret,
+`PKCS12`. That single wrong sentence is why the failure looked like a keystore
+problem for a whole session.
 
-There was nothing installable anywhere: no releases, no CI, no `eas.json`. Now
-`.github/workflows/android.yml` builds a signed APK on `workflow_dispatch` and on
-any `v*` tag, publishing it as a Release asset.
+Two faults, both invisible until Gradle's last task:
 
-- `app.json` gained `android.package = com.kafloosi.fare` and `versionCode: 1`.
-  **Neither may change once anything is installed** — Android treats a different
-  package or signing key as a different app, and the only way through is an
-  uninstall, which deletes the SQLite database.
-- The keystore is `C:\Users\luuks\fare-release.p12` (PKCS12, alias `fare`, valid
-  to 2053). Its password and the four GitHub secret values are in
-  `C:\Users\luuks\fare-release-SECRETS.txt`. **Back both up off the machine.**
-- The four repository secrets are set and confirmed working.
-- Tag `v0.1.2.2` was pushed and triggered a run.
+- Three of the four secrets did not exist. An unset secret arrives as an empty
+  string, not an error, so `echo "" | base64 -d` wrote a zero-byte file and the
+  build spent 17m48s getting to it before dying on `Tag number over 30 is not
+  supported` — an ASN.1 parse error on nothing.
+- The `PKCS12` secret was not valid base64 at all. The local
+  `C:\Users\luuks\fare-release.b64` is perfect and decodes byte-identical to the
+  `.p12`, so the value was damaged on its way *into* GitHub.
 
-**The run failed.** https://github.com/Kafloosi/Budgetting/actions/runs/30983523792
+What changed in `.github/workflows/android.yml`:
 
-It got through checkout, Node 22, JDK 17, `npm ci`, `expo prebuild` and the
-keystore restore, then failed on **Assemble the release APK**. No Release exists.
+- The restore step decodes and inspects the keystore **before** looking at
+  credentials, so a half-configured repo still learns whether its keystore is
+  sound. In order: missing keystore secret → won't base64-decode → no DER
+  `SEQUENCE` header → missing password/alias → `keytool -list` rejects it. Two
+  seconds, and the message names which.
+- `PKCS12` is read as a fallback for `ANDROID_KEYSTORE_BASE64`. Secrets cannot be
+  renamed, only recreated, and re-pasting a release keystore to relabel it is a
+  good way to lose one.
+- `checkout@v7`, `setup-node@v7`, `setup-java@v5` — clears the Node 20
+  deprecation warnings. `java-version: 17` unchanged; the action major and the
+  JDK it installs are separate things.
+- `README.md` now documents the base64 encoding it never did. A `.p12` is binary
+  and reading it as text corrupts it silently.
 
-The log could not be read from here — GitHub requires authentication for the
-Actions logs API even on a public repo, and there is no `gh` CLI or token on this
-machine. JDK 17 and Node 22 were checked against the Expo SDK 57 docs and are
-correct, so the versions are not the cause. Untested guesses, in order: Gradle
-heap exhaustion, or Android SDK platform 36 missing on the runner.
+All four secrets are set and **verified by a green build**, not by assumption.
 
-**Next step: read the failing step's log and fix the real cause.** Each attempt
-costs roughly twenty minutes, so guessing is expensive.
+### 2. CSV import bugs — PR #1, against `main`
 
-### 2. `CLAUDE.md` gained three standing rules
+Found by auditing the repo against its own `CLAUDE.md` rules.
 
-- **Session start** — open with ten ranked things worth doing, drawn from the repo
-  rather than from memory, mixed in scale, never padded to reach ten.
-- **After every change** — commit and push without asking, version bumped in
-  *both* `package.json` and `app.json` in the same commit.
-- **Tidy-up pass** — after a feature, one behaviour-preserving structural pass
-  scoped to what the feature touched.
+- `parseMoneyToCents('1.234')` returned €1.23, not €1234. "Last separator wins"
+  is right for `1.234,56` and wrong for a lone group, which is how Dutch exports
+  write plain thousands. `1.234.567` was worse — it reached `Number()` intact,
+  came back `NaN`, and the row was dropped silently.
+- `parseDate` accepted `31-02-2026` and stored it verbatim.
+- `guessDateFormat` ended `if (first > 12) return 'dmy'; return 'dmy';` — `mdy`
+  unreachable, and only the first row was ever read.
+- The 11 `no-unused-expressions` warnings are gone. Lint is clean.
 
-The version rule is written down because it was got wrong twice in this session:
-a commit subject naming a version the files did not carry.
+Note this PR is cut from `main`, which predates the `lib/dates.ts` / `db/hash.ts`
+restructure on the release branch. Expect to reconcile.
 
-### 3. Restructure — Move 1 of 3 done
+### 3. Tooling
 
-Plan: `C:\Users\luuks\.claude\plans\features-you-recommend-jiggly-matsumoto.md`
-
-Done, in `7ad19fc`:
-
-- `src/lib/dates.ts` — all calendar maths. `db/util.ts` had sixteen importers and
-  only two wanted anything database-shaped.
-- `src/db/hash.ts` — `importHash` plus `normaliseDescription`. This makes the
-  comment at `db/types.ts:76` true; it had always documented `importHash` as
-  living in `./hash`.
-- `db/util.ts` keeps `withTransaction`, `newId`, `nowIso`.
+`gh` CLI 2.97.0 installed at `C:\Program Files\GitHub CLI\gh.exe`, authenticated
+as `Kafloosi` (scopes `gist`, `read:org`, `repo`). Existing shells need a restart
+to get it on `PATH`. Reading Actions logs is what unblocked this session — the
+previous one guessed at the failure because it could not.
 
 ## In flight
 
-Nothing half-applied. Move 1 is complete and verified; Moves 2 and 3 have not been
-started.
+Nothing half-applied. Both PRs are complete and verified; neither is merged.
 
 ## Next
 
-1. **Fix the Android build.** Read the log, fix, re-tag. Until this works there is
-   still no way to install Fare on a phone.
-2. **Merge the branch.** Note also that `workflow_dispatch` only appears in the
-   Actions tab for workflows already on the default branch.
-3. **Restructure Move 2 (`0.1.2.7`)** — extract `src/components/plate.tsx`. The
+1. **Merge PR #2**, then decide how `worktree-android-release-build` reaches
+   `main`. `workflow_dispatch` only appears in the Actions tab for workflows
+   already on the default branch — until the workflow is on `main`, dispatching
+   needs `gh workflow run --ref <branch>`.
+2. **Reconcile the version lines.** This branch is `0.1.2.11`; PR #1 takes `main`
+   to `0.1.1.6`. They will conflict on `package.json` and `app.json`.
+3. **Security tidy-up**, none of it blocking:
+   - Delete the `PKCS12` secret — it holds an unusable value and is shadowed.
+   - Delete `C:\Users\luuks\fare-release.b64`; it is a second copy of the private
+     key in a trivially decodable form.
+   - `fare-release-SECRETS.txt` keeps the password in plaintext beside the `.p12`.
+     Move both into a password manager.
+   - Rotate the store password — `keytool -storepasswd` changes the password, not
+     the key, so signed APKs stay installable.
+   - Enable **Google Play App Signing** when publishing. Play holds the app
+     signing key and you keep a replaceable upload key, so losing the keystore
+     stops being a catastrophe that costs users their ledger.
+4. **Restructure Move 2 (`0.1.2.12`)** — extract `src/components/plate.tsx`. The
    same selectable control exists nine times: `DirectionPlate` (`app/entry.tsx`),
    `SpanPlate` (`app/stats.tsx`), `KindPlate` (`app/category.tsx`), `ScopePlate`
-   (`app/budget.tsx`), `Plate` (`app/recurring-rule.tsx`), `Chip` (`app/import.tsx`),
-   `FilterChip` (`app/(tabs)/ledger.tsx`), `Chip` (`components/day-picker.tsx`) and
-   inline plates in settings. The first three are identical apart from their names.
-   Do **not** absorb the `CurrencyPicker` option row — different control.
-4. **Restructure Move 3 (`0.1.2.8`)** — move `toDraft` and `Mapping` out of the
-   419-line `app/import.tsx` into `lib/csv.ts`.
-5. **Import triage + routing rules** — planned in full in the same plan file, and
-   deliberately sequenced after the restructure so its two new screens are built on
-   the extracted plate rather than adding a tenth and eleventh copy. `import_rules`
-   ships in migration 0 with no repository and no UI, and `app/import.tsx:113` still
-   inserts every row with `category_id: null`.
+   (`app/budget.tsx`), `Plate` (`app/recurring-rule.tsx`), `Chip`
+   (`app/import.tsx`), `FilterChip` (`app/(tabs)/ledger.tsx`), `Chip`
+   (`components/day-picker.tsx`) and inline plates in settings. The first three
+   are identical apart from their names. Do **not** absorb the `CurrencyPicker`
+   option row — different control.
+5. **Restructure Move 3** — move `toDraft` and `Mapping` out of the 419-line
+   `app/import.tsx` into `lib/csv.ts`.
+6. **Import triage + routing rules** — planned in
+   `C:\Users\luuks\.claude\plans\features-you-recommend-jiggly-matsumoto.md`,
+   sequenced after the restructure so its two new screens use the extracted plate.
+   `import_rules` ships in migration 0 with no repository and no UI, and
+   `app/import.tsx:113` still inserts every row with `category_id: null`.
 
 ## Traps
 
+- **Do not record a secret as "set and confirmed" without checking.** `gh secret
+  list` takes a second and names them. This cost a session.
 - **PowerShell 5.1 `Get-Content -Raw` reads BOM-less UTF-8 as ANSI.** Writing it
-  back double-encodes every em dash into `â€”`. It corrupted twenty files here
-  before being caught in the diff and reverted. Use
+  back double-encodes every em dash into `â€”`. Use
   `[System.IO.File]::ReadAllText` / `WriteAllText` with `UTF8Encoding($false)`.
-  `Set-Content -Encoding utf8` also adds a BOM, which the linter flags.
+  `Set-Content -Encoding utf8` adds a BOM, which the linter flags.
+- **Encoding a `.p12` for a secret**: PowerShell 5.1 needs `-Encoding Byte`,
+  PowerShell 7 needs `-AsByteStream`, elsewhere `base64 -w0`. `certutil -encode`
+  wraps the data in PEM lines and is not a substitute.
 - **A fresh clone has no `expo-env.d.ts`**, and `npm run typecheck` fails on
-  `@/global.css` without it. Run `npm start` once, or copy the file across.
-- The 11 `no-unused-expressions` lint warnings in `db/repositories/transactions.ts`
-  are pre-existing and unrelated.
+  `@/global.css` without it. Run `npm start` once, or write
+  `/// <reference types="expo/types" />` into it by hand.
+- **Git Bash mangles `git show branch:path`** — colons and slashes get rewritten.
+  Prefix with `MSYS_NO_PATHCONV=1`.
+- Bumping the version has only ever touched `package.json` and `app.json`, so
+  `package-lock.json` drifted to `0.1.0.0`. PR #1 resyncs it on the `main` line;
+  this branch still carries the stale value. `npm ci` does not care.
 
 ## Open decisions
 
 - App name for the stores. `PRODUCT.md` says undecided; `app.json` says "Fare".
-  The Android package now commits to `com.kafloosi.fare` regardless.
+  The Android package commits to `com.kafloosi.fare` regardless.
+- **EAS vs the current build.** Asked and answered this session: not worth
+  switching for security — EAS means trusting Expo *in addition to* GitHub, and
+  it holds the signing key by default. Switch only for iOS, which this setup can
+  never do from Windows.
 - Multi-currency — the schema carries `currency` per account, nothing decides
   whether the product supports more than one.
 - Whether accounts are surfaced to the user at all.
