@@ -68,14 +68,14 @@ jobs:
         if: always()
         run: rm -f android/app/release.keystore
 
-      # A release APK that skipped the JS bundle step still builds and still
-      # installs — it just crashes on launch. Size is the cheapest way to catch it.
-      - name: Check the APK is not empty
+      # An APK that skipped the JS bundle step still builds, still installs, and
+      # crashes on launch. Native libraries dominate the file size, so size proves
+      # nothing — look inside for the bundle itself.
+      - name: Check the JS bundle made it into the APK
         run: |
           APK=android/app/build/outputs/apk/release/app-release.apk
-          SIZE=$(stat -c%s "$APK")
-          echo "APK is $((SIZE / 1024 / 1024)) MB"
-          test "$SIZE" -gt 10000000
+          ls -lh "$APK"
+          unzip -l "$APK" | grep -q 'assets/index.android.bundle'
 
       - uses: actions/upload-artifact@v4
         with:
