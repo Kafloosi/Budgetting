@@ -128,12 +128,17 @@ export async function updateTransaction(
   const sets: string[] = [];
   const params: (string | number | null)[] = [];
 
-  if (patch.amount_cents !== undefined) (sets.push('amount_cents = ?'), params.push(patch.amount_cents));
-  if (patch.date !== undefined) (sets.push('date = ?'), params.push(patch.date));
-  if (patch.description !== undefined) (sets.push('description = ?'), params.push(patch.description));
-  if (patch.category_id !== undefined) (sets.push('category_id = ?'), params.push(patch.category_id));
-  if (patch.account_id !== undefined) (sets.push('account_id = ?'), params.push(patch.account_id));
-  if (patch.notes !== undefined) (sets.push('notes = ?'), params.push(patch.notes));
+  const set = (column: string, value: string | number | null) => {
+    sets.push(`${column} = ?`);
+    params.push(value);
+  };
+
+  if (patch.amount_cents !== undefined) set('amount_cents', patch.amount_cents);
+  if (patch.date !== undefined) set('date', patch.date);
+  if (patch.description !== undefined) set('description', patch.description);
+  if (patch.category_id !== undefined) set('category_id', patch.category_id);
+  if (patch.account_id !== undefined) set('account_id', patch.account_id);
+  if (patch.notes !== undefined) set('notes', patch.notes);
   if (sets.length === 0) return;
 
   sets.push('updated_at = ?');

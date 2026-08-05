@@ -144,19 +144,35 @@ export function parseDate(value: string, format: DateFormat): string | null {
 
   const monthNumber = Number(month);
   const dayNumber = Number(day);
-  if (!monthNumber || monthNumber > 12 || !dayNumber || dayNumber > 31) return null;
+  if (!monthNumber || monthNumber > 12 || !dayNumber) return null;
+
+  // Day 0 of the next month is the last day of this one, so this rejects the
+  // 31st of February without a table of month lengths, and gets leap years
+  // right. A date the calendar does not have means the column mapping is wrong,
+  // and saying so beats storing `2026-02-31` and sorting it after the 28th.
+  if (dayNumber > new Date(Number(year), monthNumber, 0).getDate()) return null;
 
   return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
 }
 
 /** Guesses the date format from a column's values, defaulting to ISO. */
 export function guessDateFormat(values: string[]): DateFormat {
-  const sample = values.find((value) => value.trim().length > 0) ?? '';
-  if (/^\d{8}$/.test(sample.trim())) return 'compact';
+  const samples = values.map((value) => value.trim()).filter(Boolean);
+  const sample = samples[0] ?? '';
+  if (/^\d{8}$/.test(sample)) return 'compact';
   if (/^\d{4}[^0-9]\d{1,2}[^0-9]\d{1,2}/.test(sample)) return 'iso';
-  // Anything above 12 in the first position can only be a day.
-  const first = Number(sample.split(/[^0-9]+/).filter(Boolean)[0]);
-  if (first > 12) return 'dmy';
+
+  // Read the whole column, not just its first row. One statement opening on the
+  // 4th of August tells you nothing, but anything above 12 somewhere in the
+  // column pins that position to the day and settles the file.
+  for (const value of samples) {
+    const [first, second] = value.split(/[^0-9]+/).filter(Boolean).map(Number);
+    if (first > 12) return 'dmy';
+    if (second > 12) return 'mdy';
+  }
+
+  // Genuinely ambiguous. These exports are read against Dutch banks first, and
+  // the user can still correct the column mapping by hand.
   return 'dmy';
 }
 

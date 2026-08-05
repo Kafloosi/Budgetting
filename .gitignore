@@ -21,6 +21,9 @@ expo-env.d.ts
 # Metro
 .metro-health-check*
 
+# Agent worktrees — checkouts of this same repo, not content for it
+.claude/worktrees/
+
 # debug
 npm-debug.*
 yarn-debug.*
