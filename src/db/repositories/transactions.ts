@@ -27,6 +27,8 @@ export interface TransactionWithCategory extends Transaction {
 export interface TransactionQuery {
   month?: MonthKey;
   categoryId?: string;
+  /** Only rows with no category yet — the triage queue. Ignores `categoryId`. */
+  uncategorised?: boolean;
   /** Case-insensitive substring match on description and notes. */
   search?: string;
   /** `out` is spending, `in` is income. Omit for both. */
@@ -44,7 +46,9 @@ function buildFilter(query: TransactionQuery): { where: string; params: (string 
     clauses.push('t.date BETWEEN ? AND ?');
     params.push(start, end);
   }
-  if (query.categoryId) {
+  if (query.uncategorised) {
+    clauses.push('t.category_id IS NULL');
+  } else if (query.categoryId) {
     clauses.push('t.category_id = ?');
     params.push(query.categoryId);
   }
@@ -80,6 +84,14 @@ export async function listTransactions(
       LIMIT ? OFFSET ?`,
     [...params, limit, offset],
   );
+}
+
+/** How many rows are waiting to be filed. Drives the triage prompt. */
+export async function countUncategorised(db: SQLiteDatabase): Promise<number> {
+  const row = await db.getFirstAsync<{ count: number }>(
+    'SELECT COUNT(*) AS count FROM transactions WHERE deleted_at IS NULL AND category_id IS NULL',
+  );
+  return row?.count ?? 0;
 }
 
 export async function getTransaction(

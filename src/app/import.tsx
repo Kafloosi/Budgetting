@@ -14,7 +14,12 @@ import { SheetHeader } from '@/components/sheet';
 import { Text } from '@/components/text';
 import { IconImport, IconTick } from '@/components/transit/icons';
 import { Line, Radius, Space, Stroke, TouchTarget } from '@/constants/theme';
-import { bulkInsertImported, type TransactionInput } from '@/db/repositories/transactions';
+import { loadRuleMatcher } from '@/db/repositories/import-rules';
+import {
+  bulkInsertImported,
+  countUncategorised,
+  type TransactionInput,
+} from '@/db/repositories/transactions';
 import { importHash } from '@/db/hash';
 import {
   DATE_FORMAT_LABELS,
@@ -49,7 +54,12 @@ export default function ImportScreen() {
   const [mapping, setMapping] = useState<Mapping | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<{ inserted: number; skipped: number } | null>(null);
+  const [result, setResult] = useState<{
+    inserted: number;
+    skipped: number;
+    /** Rows anywhere in the ledger still without a category, after this import. */
+    waiting: number;
+  } | null>(null);
 
   async function pick() {
     setError(null);
@@ -97,13 +107,16 @@ export default function ImportScreen() {
         .map((row) => toDraft(row, mapping))
         .filter((draft): draft is Draft => draft !== null);
 
+      // Loaded once for the whole statement rather than queried per row.
+      const matchCategory = await loadRuleMatcher(db);
+
       const inputs: TransactionInput[] = [];
       for (const draft of drafts) {
         inputs.push({
           amount_cents: draft.amount_cents,
           date: draft.date,
           description: draft.description,
-          category_id: null,
+          category_id: matchCategory(draft.description),
           source: 'import',
           import_hash: await importHash(draft.date, draft.amount_cents, draft.description),
         });
@@ -111,7 +124,7 @@ export default function ImportScreen() {
 
       const outcome = await bulkInsertImported(db, inputs);
       invalidate();
-      setResult(outcome);
+      setResult({ ...outcome, waiting: await countUncategorised(db) });
     } catch (importError) {
       setError(`The import stopped. ${(importError as Error).message}`);
     } finally {
@@ -271,9 +284,17 @@ export default function ImportScreen() {
             <Text variant="body" style={styles.resultText}>
               {result.inserted === 0
                 ? 'Everything in that file was already in the ledger. Nothing was added twice.'
-                : `${result.inserted} added${result.skipped > 0 ? `, ${result.skipped} already there` : ''}. They are uncategorised until you assign them.`}
+                : `${result.inserted} added${result.skipped > 0 ? `, ${result.skipped} already there` : ''}. ${
+                    result.waiting === 0
+                      ? 'Your rules filed every one of them.'
+                      : `${result.waiting} in the ledger still need a category.`
+                  }`}
             </Text>
           </View>
+        ) : null}
+
+        {result && result.waiting > 0 ? (
+          <Button label={`File ${result.waiting} rows`} onPress={() => router.push('/triage')} />
         ) : null}
 
         {csv && !result ? (

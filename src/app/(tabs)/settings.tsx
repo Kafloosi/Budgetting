@@ -11,6 +11,7 @@ import {
   IconArrow,
   IconBackup,
   IconChart,
+  IconDisruption,
   IconGoal,
   IconImport,
   IconPoints,
@@ -20,10 +21,12 @@ import {
 } from '@/components/transit/icons';
 import { Elevation, Line, Radius, Space, Stroke, TouchTarget } from '@/constants/theme';
 import type { AppearancePreference } from '@/db/repositories/settings';
+import { countUncategorised } from '@/db/repositories/transactions';
 import { CURRENCIES, type CurrencyOption } from '@/lib/currencies';
 import { formatMoney } from '@/lib/money';
 import { canUseAppLock } from '@/providers/app-lock';
 import { useTheme } from '@/hooks/use-theme';
+import { useLedgerQuery } from '@/providers/ledger';
 import { useSettings } from '@/providers/settings';
 
 const APPEARANCES: { value: AppearancePreference; label: string }[] = [
@@ -44,6 +47,10 @@ export default function SettingsScreen() {
   const { settings, update } = useSettings();
   const [pickingCurrency, setPickingCurrency] = useState(false);
   const [lockAvailable, setLockAvailable] = useState(false);
+
+  // Only surfaced when there is a backlog — a row reading "0 to file" is noise.
+  const uncategorised = useLedgerQuery((database) => countUncategorised(database), []);
+  const waiting = uncategorised.data ?? 0;
 
   useEffect(() => {
     let cancelled = false;
@@ -126,6 +133,20 @@ export default function SettingsScreen() {
             icon={<IconImport size={20} color={theme.inkMuted} />}
             onPress={() => router.push('/import')}
           />
+          <Row
+            label="Import rules"
+            value="Which payee goes on which line"
+            icon={<IconPoints size={20} color={theme.inkMuted} />}
+            onPress={() => router.push('/import-rules')}
+          />
+          {waiting > 0 ? (
+            <Row
+              label="To file"
+              value={`${waiting} imported ${waiting === 1 ? 'row has' : 'rows have'} no line yet`}
+              icon={<IconDisruption size={20} color={theme.onGround.amber} />}
+              onPress={() => router.push('/triage')}
+            />
+          ) : null}
           <Row
             label="Backup"
             value="Export everything, or move to a new phone"

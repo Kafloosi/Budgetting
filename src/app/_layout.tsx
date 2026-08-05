@@ -129,8 +129,14 @@ function Navigation() {
           name="recurring-rule"
           options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
         />
+        <Stack.Screen
+          name="import-rule"
+          options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+        />
         <Stack.Screen name="categories" />
         <Stack.Screen name="import" />
+        <Stack.Screen name="import-rules" />
+        <Stack.Screen name="triage" />
         <Stack.Screen name="stats" />
         <Stack.Screen name="goals" />
         <Stack.Screen name="recurring" />
