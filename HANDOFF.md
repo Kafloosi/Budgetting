@@ -1,21 +1,26 @@
 # Handoff
 
-Updated: 2026-08-05 · version 0.1.2.11
+Updated: 2026-08-05 · version 0.1.2.12
 
 ## Read this first
 
-**The Android build works.** A signed APK now builds end to end:
+**The Android build works.** A signed APK builds end to end:
 https://github.com/Kafloosi/Budgetting/actions/runs/31027616779 — `BUILD
 SUCCESSFUL in 23m 29s`, JS bundle verified inside, 54.1 MB artifact.
 
-**Nothing is merged.** Two open draft PRs, neither on `main`:
+**Everything is on `main`.** PR #1 (CSV import fixes) and PR #2 (the build fix)
+both merged, and this commit merges the whole `0.1.2.x` release line into `main`
+as well. One trunk again, at `0.1.2.12`.
 
-| PR | Branch | Into | What |
-| --- | --- | --- | --- |
-| [#2](https://github.com/Kafloosi/Budgetting/pull/2) | `fix-apk-signing` | `worktree-android-release-build` | the build fix, `0.1.2.11` |
-| [#1](https://github.com/Kafloosi/Budgetting/pull/1) | `audit-fixes` | `main` | CSV import bugs, `0.1.1.6` |
+The merge conflicted only on the version fields in `package.json` and `app.json`
+— `0.1.2.11` against `0.1.1.6`. Everything else auto-merged, including
+`db/repositories/transactions.ts`, which each line had edited: the release line
+moved `monthBounds` to `@/lib/dates`, and `main` replaced the comma-operator
+assignments with a local `set()`. Both survived. `typecheck` and `lint` are clean
+on the result.
 
-`main` is still at `351ac17` (`0.1.1.5`) and has no `.github/` at all.
+`worktree-android-release-build` is now fully contained in `main` and can be
+deleted, along with the merged `audit-fixes` and `fix-apk-signing`.
 
 ## Where we left off
 
@@ -67,8 +72,8 @@ Found by auditing the repo against its own `CLAUDE.md` rules.
   unreachable, and only the first row was ever read.
 - The 11 `no-unused-expressions` warnings are gone. Lint is clean.
 
-Note this PR is cut from `main`, which predates the `lib/dates.ts` / `db/hash.ts`
-restructure on the release branch. Expect to reconcile.
+This was cut from `main`, which predated the `lib/dates.ts` / `db/hash.ts`
+restructure. Reconciled in the merge — see "Read this first".
 
 ### 3. Tooling
 
@@ -79,16 +84,19 @@ previous one guessed at the failure because it could not.
 
 ## In flight
 
-Nothing half-applied. Both PRs are complete and verified; neither is merged.
+Nothing half-applied. Everything is merged into `main` and verified.
 
 ## Next
 
-1. **Merge PR #2**, then decide how `worktree-android-release-build` reaches
-   `main`. `workflow_dispatch` only appears in the Actions tab for workflows
-   already on the default branch — until the workflow is on `main`, dispatching
-   needs `gh workflow run --ref <branch>`.
-2. **Reconcile the version lines.** This branch is `0.1.2.11`; PR #1 takes `main`
-   to `0.1.1.6`. They will conflict on `package.json` and `app.json`.
+1. **Cut the first real release.** `git tag v0.1.3.0 && git push --tags` builds
+   the APK and attaches it to a GitHub Release. Nothing has shipped signed yet,
+   so this is the moment the keystore becomes permanent — after this, that one
+   `.p12` is the only way to update an installed Fare without an uninstall, and
+   an uninstall deletes the ledger.
+2. **Delete the merged branches** — `audit-fixes`, `fix-apk-signing`,
+   `worktree-android-release-build`. All three are contained in `main`.
+   `workflow_dispatch` now appears in the Actions tab, since the workflow is on
+   the default branch at last.
 3. **Security tidy-up**, none of it blocking:
    - Delete the `PKCS12` secret — it holds an unusable value and is shadowed.
    - Delete `C:\Users\luuks\fare-release.b64`; it is a second copy of the private
@@ -100,7 +108,7 @@ Nothing half-applied. Both PRs are complete and verified; neither is merged.
    - Enable **Google Play App Signing** when publishing. Play holds the app
      signing key and you keep a replaceable upload key, so losing the keystore
      stops being a catastrophe that costs users their ledger.
-4. **Restructure Move 2 (`0.1.2.12`)** — extract `src/components/plate.tsx`. The
+4. **Restructure Move 2 (`0.1.2.13`)** — extract `src/components/plate.tsx`. The
    same selectable control exists nine times: `DirectionPlate` (`app/entry.tsx`),
    `SpanPlate` (`app/stats.tsx`), `KindPlate` (`app/category.tsx`), `ScopePlate`
    (`app/budget.tsx`), `Plate` (`app/recurring-rule.tsx`), `Chip`

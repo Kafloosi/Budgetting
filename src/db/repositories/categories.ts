@@ -60,11 +60,16 @@ export async function updateCategory(
   const sets: string[] = [];
   const params: (string | number)[] = [];
 
-  if (patch.name !== undefined) (sets.push('name = ?'), params.push(patch.name));
-  if (patch.kind !== undefined) (sets.push('kind = ?'), params.push(patch.kind));
-  if (patch.color !== undefined) (sets.push('color = ?'), params.push(patch.color));
-  if (patch.icon !== undefined) (sets.push('icon = ?'), params.push(patch.icon));
-  if (patch.archived !== undefined) (sets.push('archived = ?'), params.push(patch.archived ? 1 : 0));
+  const set = (column: string, value: string | number) => {
+    sets.push(`${column} = ?`);
+    params.push(value);
+  };
+
+  if (patch.name !== undefined) set('name', patch.name);
+  if (patch.kind !== undefined) set('kind', patch.kind);
+  if (patch.color !== undefined) set('color', patch.color);
+  if (patch.icon !== undefined) set('icon', patch.icon);
+  if (patch.archived !== undefined) set('archived', patch.archived ? 1 : 0);
   if (sets.length === 0) return;
 
   sets.push('updated_at = ?');
