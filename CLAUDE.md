@@ -23,9 +23,11 @@ npm run android    # emulator
 npm run web
 npm run typecheck
 npm run lint
+npm run check:migrations   # after touching db/migrations.ts
 ```
 
 - No tests exist. `typecheck` + `lint` are the only checks.
+- `check:migrations` replays the schema and refuses an edit to a shipped migration. Run it with `--update` once a new one is final.
 - Fresh clone: `npm start` once first. It makes `expo-env.d.ts`.
 - No iOS builds here. Use Expo Go on a real iPhone.
 
@@ -38,7 +40,9 @@ npm run lint
 - SQL only in `db/repositories/`. Screens call repo functions.
 - Reads use `useLedgerQuery`. After every write call `useInvalidateLedger()`.
 - Use `withTransaction()` from `db/util.ts`. Never `withExclusiveTransactionAsync`.
-- `MIGRATIONS` in `db/migrations.ts` is append-only. Never edit or reorder a shipped one. Fix old rows in a new migration, by id.
+- `MIGRATIONS` in `db/migrations.ts` is append-only. Never edit or reorder a shipped one. Fix old rows in a new migration, by id. `npm run check:migrations` enforces this.
+- Every ledger table carries `id`, `household_id`, `created_at`, `updated_at`, `deleted_at`. Only `settings` is exempt.
+- A unique index must exclude soft-deleted rows.
 - Imports dedupe on a content hash: date + amount + cleaned description.
 - Budgets: a `YYYY-MM` row beats the recurring row.
 - Import rules fill an empty category only. Never overwrite one set by hand.

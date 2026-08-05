@@ -1,7 +1,7 @@
 {
   "name": "budgetting",
   "main": "expo-router/entry",
-  "version": "0.1.5.0",
+  "version": "0.1.5.1",
   "dependencies": {
     "@expo/ui": "~57.0.9",
     "expo": "~57.0.10",
@@ -48,7 +48,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "check:migrations": "node ./scripts/check-migrations.mjs"
   },
   "private": true
 }
