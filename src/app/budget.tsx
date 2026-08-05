@@ -15,7 +15,7 @@ import { Line, Radius, Space, Stroke, TouchTarget } from '@/constants/theme';
 import { getBudgetProgress, getRecurringLimits, removeBudget, setBudget } from '@/db/repositories/budgets';
 import { getCategory } from '@/db/repositories/categories';
 import { getCategorySpend } from '@/db/repositories/transactions';
-import { formatMonthLabel } from '@/db/util';
+import { formatMonthLabel } from '@/lib/dates';
 import { useTheme } from '@/hooks/use-theme';
 import { useInvalidateLedger, useLedgerQuery } from '@/providers/ledger';
 import { useMoney } from '@/providers/settings';

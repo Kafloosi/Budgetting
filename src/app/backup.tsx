@@ -13,7 +13,7 @@ import { Text } from '@/components/text';
 import { IconTick } from '@/components/transit/icons';
 import { Line, Radius, Space, Stroke } from '@/constants/theme';
 import { exportBackup, exportCsv, restoreBackup } from '@/lib/backup';
-import { toDateOnly } from '@/db/util';
+import { toDateOnly } from '@/lib/dates';
 import { useTheme } from '@/hooks/use-theme';
 import { useInvalidateLedger } from '@/providers/ledger';
 import { useSettings } from '@/providers/settings';

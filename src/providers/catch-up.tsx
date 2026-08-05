@@ -4,7 +4,7 @@ import { AppState } from 'react-native';
 
 import { catchUpRecurring } from '@/db/repositories/recurring';
 import { purgeExpired } from '@/db/repositories/trash';
-import { toDateOnly } from '@/db/util';
+import { toDateOnly } from '@/lib/dates';
 import { useInvalidateLedger } from '@/providers/ledger';
 
 /**

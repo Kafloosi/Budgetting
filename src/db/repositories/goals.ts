@@ -1,7 +1,9 @@
+import { toMonthKey } from '@/lib/dates';
+
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 import type { DateOnly, Goal } from '../types';
-import { newId, nowIso, toMonthKey } from '../util';
+import { newId, nowIso } from '../util';
 
 export interface GoalInput {
   name: string;

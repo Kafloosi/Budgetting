@@ -4,7 +4,7 @@ import { Text } from '@/components/text';
 import { IconArrow, IconBack } from '@/components/transit/icons';
 import { Radius, Space, Stroke, TouchTarget } from '@/constants/theme';
 import type { MonthKey } from '@/db/types';
-import { formatMonthLabel, shiftMonth, toMonthKey } from '@/db/util';
+import { formatMonthLabel, shiftMonth, toMonthKey } from '@/lib/dates';
 import { useTheme } from '@/hooks/use-theme';
 import { useMoney } from '@/providers/settings';
 

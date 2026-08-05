@@ -10,7 +10,7 @@
 import type { BudgetProgress } from '@/db/repositories/budgets';
 import type { MonthTotals } from '@/db/repositories/transactions';
 import type { MonthKey } from '@/db/types';
-import { daysInMonth, elapsedDaysInMonth } from '@/db/util';
+import { daysInMonth, elapsedDaysInMonth } from '@/lib/dates';
 
 /**
  * Under this many days a projection is noise dressed as a number.

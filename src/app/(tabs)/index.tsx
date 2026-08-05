@@ -17,7 +17,7 @@ import { Line, Space, Stroke } from '@/constants/theme';
 import { getBudgetProgress } from '@/db/repositories/budgets';
 import { goalProgress, listGoals } from '@/db/repositories/goals';
 import { getCategorySpend, getMonthTotals, listMonthsWithData, listTransactions } from '@/db/repositories/transactions';
-import { shiftMonth, toMonthKey } from '@/db/util';
+import { shiftMonth, toMonthKey } from '@/lib/dates';
 import { forecastMonth } from '@/lib/forecast';
 import { computeInsights } from '@/lib/insights';
 import { useTheme } from '@/hooks/use-theme';

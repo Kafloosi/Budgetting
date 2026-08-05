@@ -83,10 +83,12 @@ src/
   db/
     types.ts            domain types
     migrations.ts       schema + migration runner (append-only)
-    util.ts             ids, timestamps, month and day maths, import hashing
+    util.ts             ids, timestamps, transactions
+    hash.ts             import fingerprinting, description normalising
     repositories/       the only place SQL lives
   lib/
     money.ts            cents <-> display strings, input parsing
+    dates.ts            month and day maths
     csv.ts, backup.ts, forecast.ts, insights.ts, currencies.ts, haptics.ts
 scripts/
   make-icons.mjs        the roundel, as app icon and splash

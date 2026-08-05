@@ -14,7 +14,7 @@ import { Text } from '@/components/text';
 import { IconImport, IconTick } from '@/components/transit/icons';
 import { Line, Radius, Space, Stroke, TouchTarget } from '@/constants/theme';
 import { bulkInsertImported, type TransactionInput } from '@/db/repositories/transactions';
-import { importHash } from '@/db/util';
+import { importHash } from '@/db/hash';
 import {
   DATE_FORMAT_LABELS,
   guessColumns,
