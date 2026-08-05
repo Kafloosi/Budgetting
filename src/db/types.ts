@@ -127,6 +127,12 @@ export interface Budget extends SyncableRecord {
    */
   month: MonthKey | null;
   limit_cents: number;
+  /**
+   * 1 when what is left over at the end of a month is added to the next one.
+   * Held on every budget row for the category, since it describes the limit
+   * rather than one month of it.
+   */
+  rollover: number;
 }
 
 /**

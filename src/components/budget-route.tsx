@@ -42,13 +42,25 @@ export function BudgetRoute({
         ? theme.onGround.amber
         : theme.inkMuted;
 
+  // Why this month's room is not simply the limit. Stated in words, because the
+  // route cannot draw the difference between a generous limit and a carried
+  // balance, and the number over the track would otherwise look wrong.
+  const carry =
+    progress.rollover && progress.carry_in_cents !== 0
+      ? progress.carry_in_cents > 0
+        ? `${money.formatAbs(progress.carry_in_cents)} carried over from earlier months`
+        : `${money.formatAbs(progress.carry_in_cents)} of earlier overspend still to pay off`
+      : null;
+
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole={onPress ? 'button' : undefined}
       accessibilityLabel={`${progress.category_name}: ${money.formatAbs(
         progress.spent_cents,
-      )} of ${money.formatAbs(progress.limit_cents)} spent. ${status}.`}
+      )} of ${money.formatAbs(progress.effective_limit_cents)} spent. ${status}.${
+        carry ? ` ${carry}.` : ''
+      }`}
       style={({ pressed }) => [
         styles.row,
         { backgroundColor: pressed ? theme.raised : 'transparent' },
@@ -66,7 +78,7 @@ export function BudgetRoute({
         <View style={styles.amounts}>
           <Money cents={-progress.spent_cents} variant="amount" colorIncome={false} signDisplay="never" />
           <Text variant="amountSmall" tone="faint">
-            {` / ${money.plain(progress.limit_cents)}`}
+            {` / ${money.plain(progress.effective_limit_cents)}`}
           </Text>
         </View>
       </View>
@@ -81,6 +93,12 @@ export function BudgetRoute({
       <Text variant="caption" color={statusColor}>
         {status}
       </Text>
+
+      {carry ? (
+        <Text variant="caption" tone="faint">
+          {carry}
+        </Text>
+      ) : null}
     </Pressable>
   );
 }

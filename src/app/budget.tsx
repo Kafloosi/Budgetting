@@ -13,7 +13,15 @@ import { Keypad } from '@/components/transit/keypad';
 import { RouteLine } from '@/components/transit/route';
 import { CategoryRoundel } from '@/components/transit/roundel';
 import { Line, Radius, Space, Stroke, TouchTarget } from '@/constants/theme';
-import { getBudgetProgress, getRecurringLimits, removeBudget, setBudget } from '@/db/repositories/budgets';
+import {
+  getBudgetProgress,
+  getRecurringLimits,
+  getRollover,
+  removeBudget,
+  ROLLOVER_WINDOW_MONTHS,
+  setBudget,
+  setRollover as persistRollover,
+} from '@/db/repositories/budgets';
 import { getCategory } from '@/db/repositories/categories';
 import { getCategorySpend } from '@/db/repositories/transactions';
 import { formatMonthLabel } from '@/lib/dates';
@@ -44,11 +52,23 @@ export default function BudgetScreen() {
   const [touched, setTouched] = useState(false);
   /** The scope + stored limit the keypad was last seeded from. */
   const [seededFrom, setSeededFrom] = useState<string | null>(null);
+  const [rollover, setRollover] = useState(false);
+  const [rolloverLoaded, setRolloverLoaded] = useState(false);
 
   const category = useLedgerQuery((database) => getCategory(database, categoryId), [categoryId]);
   const recurring = useLedgerQuery((database) => getRecurringLimits(database), []);
   const progress = useLedgerQuery((database) => getBudgetProgress(database, month), [month]);
   const spend = useLedgerQuery((database) => getCategorySpend(database, month), [month]);
+  const storedRollover = useLedgerQuery(
+    (database) => getRollover(database, categoryId),
+    [categoryId],
+  );
+
+  // Seeded once from what is stored, then the toggle is the user's.
+  if (storedRollover.data !== null && !rolloverLoaded) {
+    setRolloverLoaded(true);
+    setRollover(storedRollover.data);
+  }
 
   const existingRecurring = recurring.data?.[categoryId] ?? 0;
   const current = progress.data?.find((entry) => entry.category_id === categoryId);
@@ -72,6 +92,8 @@ export default function BudgetScreen() {
   async function save() {
     if (cents <= 0) return;
     await setBudget(db, categoryId, scope === 'recurring' ? null : month, cents);
+    // After setBudget, so a first-ever limit has a row for the flag to land on.
+    await persistRollover(db, categoryId, rollover, month);
     invalidate();
     router.back();
   }
@@ -161,6 +183,28 @@ export default function BudgetScreen() {
               : 'Enter a limit to see where this route ends'}
           </Text>
         </View>
+
+        <View style={styles.scopes} accessibilityRole="radiogroup">
+          <Plate
+            style={styles.plate}
+            numberOfLines={1}
+            label="Resets monthly"
+            active={!rollover}
+            onPress={() => setRollover(false)}
+          />
+          <Plate
+            style={styles.plate}
+            numberOfLines={1}
+            label="Carries over"
+            active={rollover}
+            onPress={() => setRollover(true)}
+          />
+        </View>
+        <Text variant="caption" tone="muted" style={styles.rolloverNote}>
+          {rollover
+            ? `What is left at the end of a month is added to the next one, and an overspend is taken off it. Counting starts from the month you turn this on, over at most the last ${ROLLOVER_WINDOW_MONTHS} months.`
+            : 'Each month starts at the limit, whatever last month did.'}
+        </Text>
       </ScrollView>
 
       <View
@@ -207,6 +251,9 @@ const styles = StyleSheet.create({
   scopes: {
     flexDirection: 'row',
     gap: Space.sm,
+  },
+  rolloverNote: {
+    paddingHorizontal: Space.xs,
   },
   plate: {
     flex: 1,

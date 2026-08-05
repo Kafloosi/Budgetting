@@ -234,6 +234,28 @@ const MIGRATIONS: string[] = [
     ON import_presets(header_signature)
     WHERE deleted_at IS NULL AND header_signature IS NOT NULL;
   `,
+
+  // 7 — carrying a limit over
+  //
+  // Underspending a limit and losing the difference at midnight on the 1st is the
+  // thing envelope budgeters expect not to happen. The flag lives on every budget
+  // row for a category rather than on one of them, because carrying over is a
+  // property of the category's limit and not of a particular month — and picking
+  // one row to hold it would mean deciding what happens when that row is the one
+  // deleted.
+  //
+  // The carried balance itself is never stored. It is computed from the months
+  // behind it, because a stored balance is a second source of truth that goes
+  // wrong the moment a past transaction is edited.
+  //
+  // `rollover_since` is the month carrying-over was switched on, and it is what
+  // stops the feature handing out money nobody banked: without it, turning
+  // rollover on for a category with a standing limit and a quiet year would
+  // credit a full limit for every one of those quiet months at once.
+  `
+  ALTER TABLE budgets ADD COLUMN rollover INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE budgets ADD COLUMN rollover_since TEXT;
+  `,
 ];
 
 /** Categories a new install starts with, so the app is usable immediately. */
