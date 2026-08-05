@@ -1,13 +1,14 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/button';
 import { CategoryRail } from '@/components/category-rail';
 import { DayPicker } from '@/components/day-picker';
 import { TextField } from '@/components/field';
+import { Plate } from '@/components/plate';
 import { Screen } from '@/components/screen';
 import { SheetHeader } from '@/components/sheet';
 import { Text } from '@/components/text';
@@ -136,8 +137,20 @@ export default function RecurringRuleScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}>
         <View style={styles.plates} accessibilityRole="radiogroup">
-          <Plate label="Out" active={direction === 'out'} onPress={() => setDirection('out')} />
-          <Plate label="In" active={direction === 'in'} onPress={() => setDirection('in')} />
+          <Plate
+            style={styles.plate}
+            numberOfLines={1}
+            label="Out"
+            active={direction === 'out'}
+            onPress={() => setDirection('out')}
+          />
+          <Plate
+            style={styles.plate}
+            numberOfLines={1}
+            label="In"
+            active={direction === 'in'}
+            onPress={() => setDirection('in')}
+          />
         </View>
 
         <View style={styles.readout}>
@@ -154,6 +167,8 @@ export default function RecurringRuleScreen() {
             {FREQUENCIES.map((candidate) => (
               <Plate
                 key={candidate}
+                style={styles.plate}
+                numberOfLines={1}
                 label={FREQUENCY_LABELS[candidate].replace('Every ', '')}
                 active={frequency === candidate}
                 onPress={() => setFrequency(candidate)}
@@ -209,44 +224,6 @@ export default function RecurringRuleScreen() {
   );
 }
 
-function Plate({
-  label,
-  active,
-  onPress,
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-}) {
-  const theme = useTheme();
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="radio"
-      accessibilityState={{ selected: active }}
-      style={({ pressed }) => [
-        styles.plate,
-        {
-          borderColor: active ? theme.ink : theme.rule,
-          backgroundColor: pressed ? theme.raised : 'transparent',
-        },
-      ]}>
-      <View
-        style={[
-          styles.plateBullet,
-          {
-            borderColor: active ? theme.ink : theme.inkFaint,
-            backgroundColor: active ? theme.ink : 'transparent',
-          },
-        ]}
-      />
-      <Text variant="station" tone={active ? 'ink' : 'muted'} numberOfLines={1}>
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   scroll: {
     flex: 1,
@@ -269,12 +246,6 @@ const styles = StyleSheet.create({
     minHeight: TouchTarget,
     paddingHorizontal: Space.sm,
     borderRadius: Radius.full,
-    borderWidth: Stroke.tick,
-  },
-  plateBullet: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
     borderWidth: Stroke.tick,
   },
   readout: {

@@ -5,6 +5,7 @@ import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/button';
 import { TextField } from '@/components/field';
+import { Plate } from '@/components/plate';
 import { Screen } from '@/components/screen';
 import { SheetHeader } from '@/components/sheet';
 import { Text } from '@/components/text';
@@ -128,8 +129,18 @@ export default function CategoryScreen() {
             Direction
           </Text>
           <View style={styles.kinds} accessibilityRole="radiogroup">
-            <KindPlate label="Spending" active={kind === 'expense'} onPress={() => setKind('expense')} />
-            <KindPlate label="Income" active={kind === 'income'} onPress={() => setKind('income')} />
+            <Plate
+              style={styles.plate}
+              label="Spending"
+              active={kind === 'expense'}
+              onPress={() => setKind('expense')}
+            />
+            <Plate
+              style={styles.plate}
+              label="Income"
+              active={kind === 'income'}
+              onPress={() => setKind('income')}
+            />
           </View>
         </View>
 
@@ -208,44 +219,6 @@ const COLOUR_NAMES: Record<string, string> = {
   [Line.teal]: 'Teal',
 };
 
-function KindPlate({
-  label,
-  active,
-  onPress,
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-}) {
-  const theme = useTheme();
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="radio"
-      accessibilityState={{ selected: active }}
-      style={({ pressed }) => [
-        styles.plate,
-        {
-          borderColor: active ? theme.ink : theme.rule,
-          backgroundColor: pressed ? theme.raised : 'transparent',
-        },
-      ]}>
-      <View
-        style={[
-          styles.plateBullet,
-          {
-            borderColor: active ? theme.ink : theme.inkFaint,
-            backgroundColor: active ? theme.ink : 'transparent',
-          },
-        ]}
-      />
-      <Text variant="station" tone={active ? 'ink' : 'muted'}>
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   content: {
     padding: Space.lg,
@@ -283,12 +256,6 @@ const styles = StyleSheet.create({
     gap: Space.sm,
     minHeight: TouchTarget,
     borderRadius: Radius.full,
-    borderWidth: Stroke.tick,
-  },
-  plateBullet: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
     borderWidth: Stroke.tick,
   },
   swatches: {

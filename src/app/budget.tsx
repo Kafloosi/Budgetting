@@ -1,10 +1,11 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/button';
+import { Plate } from '@/components/plate';
 import { Screen } from '@/components/screen';
 import { SheetHeader } from '@/components/sheet';
 import { Text } from '@/components/text';
@@ -119,7 +120,9 @@ export default function BudgetScreen() {
         </View>
 
         <View style={styles.scopes} accessibilityRole="radiogroup">
-          <ScopePlate
+          <Plate
+            style={styles.plate}
+            numberOfLines={1}
             label="Every month"
             active={scope === 'recurring'}
             onPress={() => {
@@ -127,7 +130,9 @@ export default function BudgetScreen() {
               setTouched(false);
             }}
           />
-          <ScopePlate
+          <Plate
+            style={styles.plate}
+            numberOfLines={1}
             label={formatMonthLabel(month, money.locale)}
             active={scope === 'month'}
             onPress={() => {
@@ -184,44 +189,6 @@ export default function BudgetScreen() {
   );
 }
 
-function ScopePlate({
-  label,
-  active,
-  onPress,
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-}) {
-  const theme = useTheme();
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="radio"
-      accessibilityState={{ selected: active }}
-      style={({ pressed }) => [
-        styles.plate,
-        {
-          borderColor: active ? theme.ink : theme.rule,
-          backgroundColor: pressed ? theme.raised : 'transparent',
-        },
-      ]}>
-      <View
-        style={[
-          styles.plateBullet,
-          {
-            borderColor: active ? theme.ink : theme.inkFaint,
-            backgroundColor: active ? theme.ink : 'transparent',
-          },
-        ]}
-      />
-      <Text variant="station" tone={active ? 'ink' : 'muted'} numberOfLines={1}>
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   content: {
     paddingVertical: Space.lg,
@@ -250,12 +217,6 @@ const styles = StyleSheet.create({
     minHeight: TouchTarget,
     paddingHorizontal: Space.md,
     borderRadius: Radius.full,
-    borderWidth: Stroke.tick,
-  },
-  plateBullet: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
     borderWidth: Stroke.tick,
   },
   readout: {

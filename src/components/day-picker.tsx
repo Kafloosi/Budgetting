@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Modal, Pressable, StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/button';
+import { Plate } from '@/components/plate';
 import { Text } from '@/components/text';
 import { IconArrow, IconBack } from '@/components/transit/icons';
 import { Elevation, Radius, Space, Stroke, TouchTarget } from '@/constants/theme';
@@ -49,14 +50,28 @@ export function DayPicker({
         Day
       </Text>
       <View style={styles.chips}>
-        <Chip label="Today" active={value === today} onPress={() => onChange(today)} accent={accent} />
-        <Chip
+        <Plate
+          style={styles.chip}
+          variant="label"
+          numberOfLines={1}
+          label="Today"
+          active={value === today}
+          onPress={() => onChange(today)}
+          accent={accent}
+        />
+        <Plate
+          style={styles.chip}
+          variant="label"
+          numberOfLines={1}
           label="Yesterday"
           active={value === yesterday}
           onPress={() => onChange(yesterday)}
           accent={accent}
         />
-        <Chip
+        <Plate
+          style={styles.chip}
+          variant="label"
+          numberOfLines={1}
           label={value === today || value === yesterday ? 'Another day' : label}
           active={value !== today && value !== yesterday}
           onPress={() => setOpen(true)}
@@ -96,43 +111,6 @@ export function DayPicker({
         </Pressable>
       </Modal>
     </View>
-  );
-}
-
-function Chip({
-  label,
-  active,
-  onPress,
-  accent,
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-  accent: string;
-}) {
-  const theme = useTheme();
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="radio"
-      accessibilityState={{ selected: active }}
-      style={({ pressed }) => [
-        styles.chip,
-        {
-          borderColor: active ? accent : theme.rule,
-          backgroundColor: pressed ? theme.raised : 'transparent',
-        },
-      ]}>
-      <View
-        style={[
-          styles.chipBullet,
-          { borderColor: active ? accent : theme.inkFaint, backgroundColor: active ? accent : 'transparent' },
-        ]}
-      />
-      <Text variant="label" tone={active ? 'ink' : 'muted'} numberOfLines={1}>
-        {label}
-      </Text>
-    </Pressable>
   );
 }
 
@@ -245,12 +223,6 @@ const styles = StyleSheet.create({
     minHeight: TouchTarget,
     paddingHorizontal: Space.lg,
     borderRadius: Radius.full,
-    borderWidth: Stroke.tick,
-  },
-  chipBullet: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
     borderWidth: Stroke.tick,
   },
   backdrop: {

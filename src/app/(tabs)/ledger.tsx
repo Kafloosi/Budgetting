@@ -1,18 +1,12 @@
 import { useRouter } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useMemo, useState } from 'react';
-import {
-  Pressable,
-  ScrollView,
-  SectionList,
-  StyleSheet,
-  TextInput,
-  View,
-} from 'react-native';
+import { ScrollView, SectionList, StyleSheet, TextInput, View } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { Field } from '@/components/field';
 import { Money } from '@/components/money';
+import { Plate, PlateBullet } from '@/components/plate';
 import { Screen, ScreenHeader } from '@/components/screen';
 import { SwipeToDelete } from '@/components/swipe-to-delete';
 import { Text } from '@/components/text';
@@ -230,6 +224,11 @@ export default function LedgerScreen() {
   );
 }
 
+/**
+ * A line filter. `button` rather than `radio` because these toggle — tapping the
+ * active one clears it — and the bullet keeps its route colour even when the
+ * filter is off, so the Violet chip stays tellable from the Teal one.
+ */
 function FilterChip({
   label,
   active,
@@ -243,28 +242,24 @@ function FilterChip({
   icon?: string;
   onPress: () => void;
 }) {
-  const theme = useTheme();
   return (
-    <Pressable
+    <Plate
+      style={styles.chip}
+      role="button"
+      variant="label"
+      numberOfLines={1}
+      accent={color}
+      label={label}
+      active={active}
       onPress={onPress}
-      accessibilityRole="button"
-      accessibilityState={{ selected: active }}
-      style={({ pressed }) => [
-        styles.chip,
-        {
-          borderColor: active ? color : theme.rule,
-          backgroundColor: pressed ? theme.raised : 'transparent',
-        },
-      ]}>
-      {icon ? (
-        <CategoryRoundel size={22} color={color} icon={icon} name={label} />
-      ) : (
-        <View style={[styles.chipBullet, { borderColor: color, backgroundColor: active ? color : 'transparent' }]} />
-      )}
-      <Text variant="label" tone={active ? 'ink' : 'muted'} numberOfLines={1}>
-        {label}
-      </Text>
-    </Pressable>
+      leading={
+        icon ? (
+          <CategoryRoundel size={22} color={color} icon={icon} name={label} />
+        ) : (
+          <PlateBullet color={color} filled={active} />
+        )
+      }
+    />
   );
 }
 
@@ -323,12 +318,6 @@ const styles = StyleSheet.create({
     minHeight: TouchTarget - 8,
     paddingHorizontal: Space.md,
     borderRadius: Radius.full,
-    borderWidth: Stroke.tick,
-  },
-  chipBullet: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
     borderWidth: Stroke.tick,
   },
   list: {

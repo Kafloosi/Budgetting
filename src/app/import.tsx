@@ -8,6 +8,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Button } from '@/components/button';
 import { EmptyState } from '@/components/empty-state';
 import { Money } from '@/components/money';
+import { Plate } from '@/components/plate';
 import { Screen } from '@/components/screen';
 import { SheetHeader } from '@/components/sheet';
 import { Text } from '@/components/text';
@@ -179,8 +180,12 @@ export default function ImportScreen() {
                   </Text>
                   <View style={styles.chips}>
                     {(Object.keys(DATE_FORMAT_LABELS) as DateFormat[]).map((format) => (
-                      <Chip
+                      <Plate
                         key={format}
+                        style={styles.chip}
+                        variant="label"
+                        numberOfLines={1}
+                        accent={Line.teal}
                         label={DATE_FORMAT_LABELS[format]}
                         active={mapping.format === format}
                         onPress={() => setMapping({ ...mapping, format })}
@@ -202,12 +207,20 @@ export default function ImportScreen() {
                     Signs
                   </Text>
                   <View style={styles.chips}>
-                    <Chip
+                    <Plate
+                      style={styles.chip}
+                      variant="label"
+                      numberOfLines={1}
+                      accent={Line.teal}
                       label="As written"
                       active={!mapping.allNegative}
                       onPress={() => setMapping({ ...mapping, allNegative: false })}
                     />
-                    <Chip
+                    <Plate
+                      style={styles.chip}
+                      variant="label"
+                      numberOfLines={1}
+                      accent={Line.teal}
                       label="All spending"
                       active={mapping.allNegative}
                       onPress={() => setMapping({ ...mapping, allNegative: true })}
@@ -324,8 +337,12 @@ function ColumnPicker({
       </Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
         {header.map((name, index) => (
-          <Chip
+          <Plate
             key={`${name}-${index}`}
+            style={styles.chip}
+            variant="label"
+            numberOfLines={1}
+            accent={Line.teal}
             label={name || `Column ${index + 1}`}
             detail={sample?.[index]}
             active={selected === index}
@@ -334,50 +351,6 @@ function ColumnPicker({
         ))}
       </ScrollView>
     </View>
-  );
-}
-
-function Chip({
-  label,
-  detail,
-  active,
-  onPress,
-}: {
-  label: string;
-  detail?: string;
-  active: boolean;
-  onPress: () => void;
-}) {
-  const theme = useTheme();
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="radio"
-      accessibilityState={{ selected: active }}
-      style={({ pressed }) => [
-        styles.chip,
-        {
-          borderColor: active ? Line.teal : theme.rule,
-          backgroundColor: pressed ? theme.raised : 'transparent',
-        },
-      ]}>
-      <View
-        style={[
-          styles.chipBullet,
-          { borderColor: active ? Line.teal : theme.inkFaint, backgroundColor: active ? Line.teal : 'transparent' },
-        ]}
-      />
-      <View>
-        <Text variant="label" tone={active ? 'ink' : 'muted'} numberOfLines={1}>
-          {label}
-        </Text>
-        {detail ? (
-          <Text variant="caption" tone="faint" numberOfLines={1}>
-            {detail}
-          </Text>
-        ) : null}
-      </View>
-    </Pressable>
   );
 }
 
@@ -415,12 +388,6 @@ const styles = StyleSheet.create({
     borderRadius: Radius.plate,
     borderWidth: Stroke.tick,
     maxWidth: 220,
-  },
-  chipBullet: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    borderWidth: Stroke.tick,
   },
   previewRow: {
     flexDirection: 'row',

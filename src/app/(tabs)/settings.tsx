@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 
 import { Button } from '@/components/button';
+import { Plate } from '@/components/plate';
 import { Screen, ScreenHeader, SectionLabel } from '@/components/screen';
 import { Text } from '@/components/text';
 import {
@@ -106,35 +107,13 @@ export default function SettingsScreen() {
           <SectionLabel>Appearance</SectionLabel>
           <View style={styles.plates} accessibilityRole="radiogroup">
             {APPEARANCES.map((option) => (
-              <Pressable
+              <Plate
                 key={option.value}
+                style={styles.plate}
+                label={option.label}
+                active={settings.appearance === option.value}
                 onPress={() => update({ appearance: option.value })}
-                accessibilityRole="radio"
-                accessibilityState={{ selected: settings.appearance === option.value }}
-                style={({ pressed }) => [
-                  styles.plate,
-                  {
-                    borderColor: settings.appearance === option.value ? theme.ink : theme.rule,
-                    backgroundColor: pressed ? theme.raised : 'transparent',
-                  },
-                ]}>
-                <View
-                  style={[
-                    styles.plateBullet,
-                    {
-                      borderColor:
-                        settings.appearance === option.value ? theme.ink : theme.inkFaint,
-                      backgroundColor:
-                        settings.appearance === option.value ? theme.ink : 'transparent',
-                    },
-                  ]}
-                />
-                <Text
-                  variant="station"
-                  tone={settings.appearance === option.value ? 'ink' : 'muted'}>
-                  {option.label}
-                </Text>
-              </Pressable>
+              />
             ))}
           </View>
         </View>
@@ -336,12 +315,6 @@ const styles = StyleSheet.create({
     minHeight: TouchTarget,
     paddingHorizontal: Space.sm,
     borderRadius: Radius.full,
-    borderWidth: Stroke.tick,
-  },
-  plateBullet: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
     borderWidth: Stroke.tick,
   },
   about: {

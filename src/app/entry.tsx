@@ -8,6 +8,7 @@ import { Button } from '@/components/button';
 import { CategoryRail } from '@/components/category-rail';
 import { DayPicker } from '@/components/day-picker';
 import { TextField } from '@/components/field';
+import { Plate } from '@/components/plate';
 import { Screen } from '@/components/screen';
 import { SheetHeader } from '@/components/sheet';
 import { Text } from '@/components/text';
@@ -239,12 +240,18 @@ export default function EntryScreen() {
         ) : null}
 
         <View style={styles.directions} accessibilityRole="radiogroup">
-          <DirectionPlate
+          <Plate
+            style={styles.plate}
             label="Out"
             active={direction === 'out'}
             onPress={() => setDirection('out')}
           />
-          <DirectionPlate label="In" active={direction === 'in'} onPress={() => setDirection('in')} />
+          <Plate
+            style={styles.plate}
+            label="In"
+            active={direction === 'in'}
+            onPress={() => setDirection('in')}
+          />
         </View>
 
         <View style={styles.readout} accessibilityRole="summary">
@@ -314,41 +321,6 @@ export default function EntryScreen() {
   );
 }
 
-function DirectionPlate({
-  label,
-  active,
-  onPress,
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-}) {
-  const theme = useTheme();
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="radio"
-      accessibilityState={{ selected: active }}
-      style={({ pressed }) => [
-        styles.plate,
-        {
-          borderColor: active ? theme.ink : theme.rule,
-          backgroundColor: pressed ? theme.raised : 'transparent',
-        },
-      ]}>
-      <View
-        style={[
-          styles.plateBullet,
-          { borderColor: active ? theme.ink : theme.inkFaint, backgroundColor: active ? theme.ink : 'transparent' },
-        ]}
-      />
-      <Text variant="station" tone={active ? 'ink' : 'muted'}>
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   scroll: {
     flex: 1,
@@ -372,12 +344,6 @@ const styles = StyleSheet.create({
     gap: Space.sm,
     minHeight: TouchTarget,
     borderRadius: Radius.full,
-    borderWidth: Stroke.tick,
-  },
-  plateBullet: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
     borderWidth: Stroke.tick,
   },
   readout: {

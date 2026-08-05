@@ -4,6 +4,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { Money } from '@/components/money';
+import { Plate } from '@/components/plate';
 import { Screen, SectionLabel } from '@/components/screen';
 import { SheetHeader } from '@/components/sheet';
 import { Text } from '@/components/text';
@@ -61,8 +62,18 @@ export default function StatsScreen() {
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.spans} accessibilityRole="radiogroup">
-          <SpanPlate label="Six months" active={span === 'months'} onPress={() => setSpan('months')} />
-          <SpanPlate label="Full year" active={span === 'year'} onPress={() => setSpan('year')} />
+          <Plate
+            style={styles.plate}
+            label="Six months"
+            active={span === 'months'}
+            onPress={() => setSpan('months')}
+          />
+          <Plate
+            style={styles.plate}
+            label="Full year"
+            active={span === 'year'}
+            onPress={() => setSpan('year')}
+          />
         </View>
 
         {empty ? (
@@ -173,44 +184,6 @@ function Total({ label, cents }: { label: string; cents: number }) {
   );
 }
 
-function SpanPlate({
-  label,
-  active,
-  onPress,
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-}) {
-  const theme = useTheme();
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="radio"
-      accessibilityState={{ selected: active }}
-      style={({ pressed }) => [
-        styles.plate,
-        {
-          borderColor: active ? theme.ink : theme.rule,
-          backgroundColor: pressed ? theme.raised : 'transparent',
-        },
-      ]}>
-      <View
-        style={[
-          styles.plateBullet,
-          {
-            borderColor: active ? theme.ink : theme.inkFaint,
-            backgroundColor: active ? theme.ink : 'transparent',
-          },
-        ]}
-      />
-      <Text variant="station" tone={active ? 'ink' : 'muted'}>
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   content: {
     paddingVertical: Space.xl,
@@ -229,12 +202,6 @@ const styles = StyleSheet.create({
     gap: Space.sm,
     minHeight: TouchTarget,
     borderRadius: Radius.full,
-    borderWidth: Stroke.tick,
-  },
-  plateBullet: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
     borderWidth: Stroke.tick,
   },
   section: {
