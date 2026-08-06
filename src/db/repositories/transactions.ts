@@ -4,6 +4,7 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 
 import type { DateOnly, MonthKey, Transaction, TransactionSource } from '../types';
 import { newId, nowIso, withTransaction } from '../util';
+import { defaultAccountId } from './accounts';
 
 export interface TransactionInput {
   /** Signed cents: negative for spending, positive for income. */
@@ -111,6 +112,11 @@ export async function createTransaction(
   const id = newId();
   const now = nowIso();
 
+  // Since accounts were surfaced, a live row always belongs to one. Falling back
+  // to the default rather than null keeps every balance and account filter honest
+  // without every caller having to know an account exists.
+  const accountId = input.account_id ?? (await defaultAccountId(db));
+
   await db.runAsync(
     `INSERT INTO transactions
        (id, household_id, account_id, category_id, amount_cents, date, description,
@@ -118,7 +124,7 @@ export async function createTransaction(
      VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
     [
       id,
-      input.account_id ?? null,
+      accountId,
       input.category_id,
       input.amount_cents,
       input.date,
@@ -188,6 +194,8 @@ export async function bulkInsertImported(
 ): Promise<BulkInsertResult> {
   let inserted = 0;
   const now = nowIso();
+  // Resolved once for the whole statement rather than per row.
+  const fallbackAccount = await defaultAccountId(db);
 
   await withTransaction(db, async (txn) => {
     for (const row of rows) {
@@ -198,7 +206,7 @@ export async function bulkInsertImported(
          VALUES (?, NULL, ?, ?, ?, ?, ?, ?, 'import', ?, ?, ?, NULL)`,
         [
           newId(),
-          row.account_id ?? null,
+          row.account_id ?? fallbackAccount,
           row.category_id,
           row.amount_cents,
           row.date,

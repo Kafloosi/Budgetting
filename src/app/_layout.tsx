@@ -133,6 +133,11 @@ function Navigation() {
           name="import-rule"
           options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
         />
+        <Stack.Screen
+          name="account"
+          options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+        />
+        <Stack.Screen name="accounts" />
         <Stack.Screen name="categories" />
         <Stack.Screen name="import" />
         <Stack.Screen name="import-rules" />

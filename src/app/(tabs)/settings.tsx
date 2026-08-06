@@ -14,12 +14,14 @@ import {
   IconDisruption,
   IconGoal,
   IconImport,
+  IconInterchange,
   IconPoints,
   IconTerminus,
   IconTick,
   IconTrash,
 } from '@/components/transit/icons';
 import { Elevation, Line, Radius, Space, Stroke, TouchTarget } from '@/constants/theme';
+import { countAccounts } from '@/db/repositories/accounts';
 import { WARNING_THRESHOLD } from '@/db/repositories/budgets';
 import type { AppearancePreference } from '@/db/repositories/settings';
 import { countUncategorised } from '@/db/repositories/transactions';
@@ -55,6 +57,8 @@ export default function SettingsScreen() {
   // Only surfaced when there is a backlog — a row reading "0 to file" is noise.
   const uncategorised = useLedgerQuery((database) => countUncategorised(database), []);
   const waiting = uncategorised.data ?? 0;
+  const accounts = useLedgerQuery((database) => countAccounts(database), []);
+  const accountCount = accounts.data ?? 1;
 
   /**
    * Asks the OS only when switching on, and refuses to leave the toggle looking
@@ -116,6 +120,16 @@ export default function SettingsScreen() {
             value="Lines, colours and icons"
             icon={<IconPoints size={20} color={theme.inkMuted} />}
             onPress={() => router.push('/categories')}
+          />
+          <Row
+            label="Accounts"
+            value={
+              accountCount > 1
+                ? `${accountCount} accounts and what is in them`
+                : 'Where the money sits'
+            }
+            icon={<IconInterchange size={20} color={theme.inkMuted} />}
+            onPress={() => router.push('/accounts')}
           />
           <Row
             label="Timetable"

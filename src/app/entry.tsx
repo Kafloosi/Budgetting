@@ -14,6 +14,7 @@ import { SheetHeader } from '@/components/sheet';
 import { Text } from '@/components/text';
 import { Keypad } from '@/components/transit/keypad';
 import { Line, Radius, Space, Stroke, TouchTarget } from '@/constants/theme';
+import { listAccounts } from '@/db/repositories/accounts';
 import { listCategories } from '@/db/repositories/categories';
 import {
   createTemplate,
@@ -60,9 +61,11 @@ export default function EntryScreen() {
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const [prefilled, setPrefilled] = useState<string | null>(null);
+  const [accountId, setAccountId] = useState<string | null>(null);
 
   const categories = useLedgerQuery((database) => listCategories(database), []);
   const templates = useLedgerQuery((database) => listTemplates(database), []);
+  const accounts = useLedgerQuery((database) => listAccounts(database), []);
   const existing = useLedgerQuery(
     (database) => (id ? getTransaction(database, id) : Promise.resolve(null)),
     [id],
@@ -79,7 +82,13 @@ export default function EntryScreen() {
     setDate(loaded.date);
     setDescription(loaded.description);
     setNotes(loaded.notes ?? '');
+    setAccountId(loaded.account_id);
   }
+
+  // Only offered when there is a choice to make. One account is the normal case
+  // and a picker with a single option is furniture.
+  const accountList = accounts.data ?? [];
+  const showAccounts = accountList.length > 1;
 
   const all: Category[] = categories.data ?? [];
   const visible = all.filter((category) =>
@@ -107,6 +116,7 @@ export default function EntryScreen() {
           description: description.trim(),
           category_id: categoryId,
           notes: notes.trim() || null,
+          ...(accountId ? { account_id: accountId } : {}),
         });
       } else {
         await createTransaction(db, {
@@ -115,6 +125,9 @@ export default function EntryScreen() {
           description: description.trim(),
           category_id: categoryId,
           notes: notes.trim() || null,
+          // Undefined rather than null: createTransaction resolves the default,
+          // and null would be a deliberate "no account", which cannot happen.
+          account_id: accountId ?? undefined,
         });
       }
       haptics.saved();
@@ -279,6 +292,35 @@ export default function EntryScreen() {
           </View>
         ) : null}
 
+        {showAccounts ? (
+          <View style={styles.rail}>
+            <Text variant="station" tone="muted" style={styles.railLabel}>
+              Account
+            </Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.accountRow}
+              accessibilityRole="radiogroup">
+              {accountList.map((account) => (
+                <Plate
+                  key={account.id}
+                  style={styles.accountPlate}
+                  variant="label"
+                  numberOfLines={1}
+                  accent={accent}
+                  label={account.name}
+                  active={
+                    accountId === account.id ||
+                    (accountId === null && account.id === accountList[0]?.id)
+                  }
+                  onPress={() => setAccountId(account.id)}
+                />
+              ))}
+            </ScrollView>
+          </View>
+        ) : null}
+
         {/*
           Ordered by how often each is touched, because the keypad is docked
           over the bottom of this list: whatever ends up under the fold should
@@ -368,6 +410,19 @@ const styles = StyleSheet.create({
   },
   rail: {
     gap: Space.sm,
+  },
+  accountRow: {
+    gap: Space.sm,
+    paddingHorizontal: Space.lg,
+  },
+  accountPlate: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.sm,
+    minHeight: TouchTarget,
+    paddingHorizontal: Space.lg,
+    borderRadius: Radius.full,
+    borderWidth: Stroke.tick,
   },
   railLabel: {
     paddingHorizontal: Space.lg,

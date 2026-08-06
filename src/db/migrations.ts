@@ -256,6 +256,41 @@ const MIGRATIONS: string[] = [
   ALTER TABLE budgets ADD COLUMN rollover INTEGER NOT NULL DEFAULT 0;
   ALTER TABLE budgets ADD COLUMN rollover_since TEXT;
   `,
+
+  // 8 — accounts, finally pointed at something
+  //
+  // The table has existed since migration 1 and `account_id` was plumbed through
+  // every insert, yet nothing ever wrote a non-null value: every transaction in
+  // every ledger belonged to the same invisible account. Surfacing accounts means
+  // the existing ledger has to land somewhere, so one is seeded and everything is
+  // backfilled onto it.
+  //
+  // The id is fixed rather than generated, matching the `seed-` convention the
+  // categories use, so two devices under a future sync cannot invent two
+  // different "Main" accounts and then have to reconcile them.
+  `
+  -- strftime rather than datetime(), so these timestamps match the ISO-8601 that
+  -- nowIso() writes everywhere else. Mixed formats in one column sort wrongly.
+  INSERT INTO accounts
+    (id, household_id, name, kind, currency, created_at, updated_at, deleted_at)
+  SELECT 'seed-account-main', NULL, 'Main', 'checking',
+         COALESCE((SELECT value FROM settings WHERE key = 'currency'), 'EUR'),
+         strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+         strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+         NULL
+   WHERE NOT EXISTS (SELECT 1 FROM accounts WHERE id = 'seed-account-main');
+
+  -- Trashed rows included on purpose. Trash is recoverable for 30 days, and a
+  -- row restored without an account would be the one state the rest of the app
+  -- now assumes cannot happen.
+  UPDATE transactions
+     SET account_id = 'seed-account-main'
+   WHERE account_id IS NULL;
+
+  -- Balances and the ledger's account filter both read this.
+  CREATE INDEX idx_transactions_account ON transactions(account_id)
+    WHERE deleted_at IS NULL;
+  `,
 ];
 
 /** Categories a new install starts with, so the app is usable immediately. */

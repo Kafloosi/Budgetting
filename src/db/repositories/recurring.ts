@@ -4,6 +4,7 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 
 import type { DateOnly, RecurringFrequency, RecurringRule } from '../types';
 import { newId, nowIso, withTransaction } from '../util';
+import { defaultAccountId } from './accounts';
 
 /** A rule that has run every day since 2000 is a bug, not a schedule. */
 const MAX_CATCH_UP = 400;
@@ -198,6 +199,9 @@ export async function catchUpRecurring(
 
   let created = 0;
   let touched = 0;
+  // Materialised rows belong to an account like any other, so a balance is not
+  // quietly missing the rent.
+  const accountId = await defaultAccountId(db);
 
   await withTransaction(db, async (txn) => {
     for (const rule of rules) {
@@ -211,9 +215,10 @@ export async function catchUpRecurring(
           `INSERT INTO transactions
              (id, household_id, account_id, category_id, amount_cents, date, description,
               notes, source, import_hash, recurring_id, created_at, updated_at, deleted_at)
-           VALUES (?, NULL, NULL, ?, ?, ?, ?, ?, 'manual', NULL, ?, ?, ?, NULL)`,
+           VALUES (?, NULL, ?, ?, ?, ?, ?, ?, 'manual', NULL, ?, ?, ?, NULL)`,
           [
             newId(),
+            accountId,
             rule.category_id,
             rule.amount_cents,
             date,
