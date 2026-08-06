@@ -78,6 +78,15 @@ export interface Transaction extends SyncableRecord {
   import_hash: string | null;
   /** Set when a recurring rule materialised this row. */
   recurring_id: string | null;
+  /**
+   * Shared by the two rows of a transfer between your own accounts — negative in
+   * the account it left, positive in the one it reached.
+   *
+   * Non-null means this row is not spending and not income. Every aggregate that
+   * measures either must exclude it, or moving money between your own accounts
+   * shows up as earning it.
+   */
+  transfer_group_id: string | null;
 }
 
 export type RecurringFrequency = 'weekly' | 'biweekly' | 'monthly';

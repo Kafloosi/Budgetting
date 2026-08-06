@@ -4,6 +4,7 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 
 import type { MonthKey } from '../types';
 import { newId, nowIso } from '../util';
+import { notATransfer } from './transfers';
 
 /** Fraction of the limit at which a category starts warning. */
 export const WARNING_THRESHOLD = 0.8;
@@ -108,6 +109,7 @@ async function carryInByCategory(
             SUM(-amount_cents) AS spent_cents
        FROM transactions
       WHERE deleted_at IS NULL
+        AND ${notATransfer()}
         AND amount_cents < 0
         AND category_id IN (${placeholders})
         AND date >= ?
@@ -164,6 +166,7 @@ export async function getBudgetProgress(
        SELECT category_id, SUM(-amount_cents) AS spent_cents
          FROM transactions
         WHERE deleted_at IS NULL
+          AND ${notATransfer()}
           AND amount_cents < 0
           AND date BETWEEN ? AND ?
         GROUP BY category_id

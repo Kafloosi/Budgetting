@@ -291,6 +291,24 @@ const MIGRATIONS: string[] = [
   CREATE INDEX idx_transactions_account ON transactions(account_id)
     WHERE deleted_at IS NULL;
   `,
+
+  // 9 — transfers between your own accounts
+  //
+  // A transfer is two sibling rows sharing a group id: negative in the account the
+  // money left, positive in the one it arrived in, neither carrying a category.
+  // There is no parent row on purpose — the pair sums to zero, so a plain
+  // SUM(amount_cents) over the whole ledger stays true, and each account's balance
+  // moves by exactly the right amount.
+  //
+  // The cost is that every spend and income aggregate must now exclude them, or
+  // moving your own money reads as income and inflates every forecast. That guard
+  // is in the repositories; this column is only what makes it possible.
+  `
+  ALTER TABLE transactions ADD COLUMN transfer_group_id TEXT;
+
+  CREATE INDEX idx_transactions_transfer ON transactions(transfer_group_id)
+    WHERE transfer_group_id IS NOT NULL AND deleted_at IS NULL;
+  `,
 ];
 
 /** Categories a new install starts with, so the app is usable immediately. */

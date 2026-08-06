@@ -3,6 +3,7 @@ import { shiftMonth } from '@/lib/dates';
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 import type { MonthKey } from '../types';
+import { notATransfer } from './transfers';
 
 export interface MonthBar {
   month: MonthKey;
@@ -30,6 +31,7 @@ export async function getMonthBars(
             COALESCE(SUM(CASE WHEN amount_cents < 0 THEN -amount_cents END), 0) AS expense_cents
        FROM transactions
       WHERE deleted_at IS NULL
+        AND ${notATransfer()}
         AND substr(date, 1, 7) BETWEEN ? AND ?
       GROUP BY month
       ORDER BY month`,
@@ -56,7 +58,7 @@ export async function getYearTotals(db: SQLiteDatabase, year: string): Promise<Y
             COALESCE(SUM(CASE WHEN amount_cents < 0 THEN -amount_cents END), 0) AS expense_cents,
             COALESCE(SUM(amount_cents), 0)                                      AS net_cents
        FROM transactions
-      WHERE deleted_at IS NULL AND substr(date, 1, 4) = ?`,
+      WHERE deleted_at IS NULL AND ${notATransfer()} AND substr(date, 1, 4) = ?`,
     [year],
   );
   return { year, ...(row ?? { income_cents: 0, expense_cents: 0, net_cents: 0 }) };
@@ -84,6 +86,7 @@ export async function getYearCategorySpend(
        FROM transactions t
        LEFT JOIN categories c ON c.id = t.category_id
       WHERE t.deleted_at IS NULL
+        AND ${notATransfer('t')}
         AND t.amount_cents < 0
         AND substr(t.date, 1, 4) = ?
       GROUP BY t.category_id

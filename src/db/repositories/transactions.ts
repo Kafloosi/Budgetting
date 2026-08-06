@@ -5,6 +5,7 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 import type { DateOnly, MonthKey, Transaction, TransactionSource } from '../types';
 import { newId, nowIso, withTransaction } from '../util';
 import { defaultAccountId } from './accounts';
+import { notATransfer } from './transfers';
 
 export interface TransactionInput {
   /** Signed cents: negative for spending, positive for income. */
@@ -243,7 +244,7 @@ export async function getMonthTotals(db: SQLiteDatabase, month: MonthKey): Promi
             COALESCE(SUM(amount_cents), 0)                                      AS net_cents,
             COUNT(*)                                                            AS count
        FROM transactions
-      WHERE deleted_at IS NULL AND date BETWEEN ? AND ?`,
+      WHERE deleted_at IS NULL AND ${notATransfer()} AND date BETWEEN ? AND ?`,
     [start, end],
   );
   return row ?? { income_cents: 0, expense_cents: 0, net_cents: 0, count: 0 };
@@ -278,6 +279,7 @@ export async function getCategorySpend(
        FROM transactions t
        LEFT JOIN categories c ON c.id = t.category_id
       WHERE t.deleted_at IS NULL
+        AND ${notATransfer('t')}
         AND t.amount_cents < 0
         AND t.date BETWEEN ? AND ?
       GROUP BY t.category_id

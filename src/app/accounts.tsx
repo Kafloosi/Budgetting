@@ -63,6 +63,9 @@ export default function AccountsScreen() {
         </View>
 
         <View style={styles.footer}>
+          {all.length > 1 ? (
+            <Button label="Move money between accounts" onPress={() => router.push('/transfer')} />
+          ) : null}
           <Button label="New account" variant="secondary" onPress={() => router.push('/account')} />
           <Text variant="caption" tone="muted" style={styles.note}>
             A balance is everything logged on that account added up. It is not a figure
