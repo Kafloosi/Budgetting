@@ -20,9 +20,7 @@ import {
   headerSignature,
   saveImportPreset,
 } from '@/db/repositories/import-presets';
-import { loadRuleMatcher } from '@/db/repositories/import-rules';
-import { bulkInsertImported, countUncategorised } from '@/db/repositories/transactions';
-import { importHash } from '@/db/hash';
+import { countUncategorised, runImport } from '@/db/repositories/transactions';
 import {
   DATE_FORMAT_LABELS,
   guessColumns,
@@ -34,7 +32,6 @@ import {
   type Mapping,
   type ParsedCsv,
 } from '@/lib/csv';
-import { buildImportInputs } from '@/lib/import-run';
 import { useTheme } from '@/hooks/use-theme';
 import { useInvalidateLedger } from '@/providers/ledger';
 
@@ -155,11 +152,7 @@ export default function ImportScreen() {
     if (!csv || !mapping || busy) return;
     setBusy(true);
     try {
-      // Loaded once for the whole statement rather than queried per row.
-      const matchCategory = await loadRuleMatcher(db);
-      const { inputs } = await buildImportInputs(csv.rows, mapping, matchCategory, importHash);
-
-      const outcome = await bulkInsertImported(db, inputs);
+      const outcome = await runImport(db, csv.rows, mapping);
       invalidate();
       setResult({ ...outcome, waiting: await countUncategorised(db) });
     } catch (importError) {

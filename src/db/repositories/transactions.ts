@@ -4,8 +4,12 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 
 import type { DateOnly, MonthKey, Transaction, TransactionSource } from '../types';
 import { newId, nowIso, withTransaction } from '../util';
+import { importHash } from '../hash';
 import { defaultAccountId } from './accounts';
+import { loadRuleMatcher } from './import-rules';
 import { notATransfer } from './transfers';
+import { buildImportInputs } from '@/lib/import-run';
+import type { Mapping } from '@/lib/csv';
 
 export interface TransactionInput {
   /** Signed cents: negative for spending, positive for income. */
@@ -182,6 +186,8 @@ export async function deleteTransaction(db: SQLiteDatabase, id: string): Promise
 export interface BulkInsertResult {
   inserted: number;
   skipped: number;
+  /** Ids of the rows that actually landed, so an import can be taken back. */
+  ids: string[];
 }
 
 /**
@@ -196,19 +202,23 @@ export async function bulkInsertImported(
   rows: TransactionInput[],
 ): Promise<BulkInsertResult> {
   let inserted = 0;
+  const ids: string[] = [];
   const now = nowIso();
   // Resolved once for the whole statement rather than per row.
   const fallbackAccount = await defaultAccountId(db);
 
   await withTransaction(db, async (txn) => {
     for (const row of rows) {
+      // Generated up front rather than inline, because a row that collides on
+      // import_hash inserts nothing and must not contribute an id to undo.
+      const id = newId();
       const result = await txn.runAsync(
         `INSERT OR IGNORE INTO transactions
            (id, household_id, account_id, category_id, amount_cents, date, description,
             notes, source, import_hash, created_at, updated_at, deleted_at)
          VALUES (?, NULL, ?, ?, ?, ?, ?, ?, 'import', ?, ?, ?, NULL)`,
         [
-          newId(),
+          id,
           row.account_id ?? fallbackAccount,
           row.category_id,
           row.amount_cents,
@@ -220,11 +230,60 @@ export async function bulkInsertImported(
           now,
         ],
       );
-      if (result.changes > 0) inserted++;
+      if (result.changes > 0) {
+        inserted++;
+        ids.push(id);
+      }
     }
   });
 
-  return { inserted, skipped: rows.length - inserted };
+  return { inserted, skipped: rows.length - inserted, ids };
+}
+
+export interface ImportOutcome {
+  inserted: number;
+  skipped: number;
+  /** Rows the mapping could not read. */
+  invalid: number;
+  ids: string[];
+}
+
+/**
+ * One statement, from rows of text to rows in the ledger.
+ *
+ * The single way in. Both the import screen and a file arriving from another app
+ * come through here, so there is one answer to what counts as the same
+ * transaction and one place it can change.
+ */
+export async function runImport(
+  db: SQLiteDatabase,
+  rows: string[][],
+  mapping: Mapping,
+): Promise<ImportOutcome> {
+  const matchCategory = await loadRuleMatcher(db);
+  const { inputs, invalid } = await buildImportInputs(rows, mapping, matchCategory, importHash);
+  const outcome = await bulkInsertImported(db, inputs);
+  return { ...outcome, invalid };
+}
+
+/**
+ * Takes an import back.
+ *
+ * Soft, like every other delete here, so the rows land in trash rather than
+ * vanishing — and so their import_hash keeps colliding, which is what stops an
+ * undone import from silently re-landing on the next attempt.
+ */
+export async function undoImport(db: SQLiteDatabase, ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  const now = nowIso();
+  await withTransaction(db, async (txn) => {
+    for (const id of ids) {
+      await txn.runAsync(
+        'UPDATE transactions SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL',
+        [now, now, id],
+      );
+    }
+  });
 }
 
 export interface MonthTotals {
