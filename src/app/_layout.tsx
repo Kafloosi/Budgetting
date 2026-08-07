@@ -41,6 +41,7 @@ import { migrateDatabase } from '@/db/migrations';
 import { useTheme } from '@/hooks/use-theme';
 import { AppLockGate } from '@/providers/app-lock';
 import { CatchUpProvider } from '@/providers/catch-up';
+import { IncomingFileProvider } from '@/providers/incoming';
 import { LedgerProvider } from '@/providers/ledger';
 import { SettingsProvider } from '@/providers/settings';
 import { UndoProvider } from '@/providers/undo';
@@ -68,7 +69,9 @@ export default function RootLayout() {
                 <CatchUpProvider>
                   <AppLockGate>
                     <UndoProvider>
-                      <Navigation />
+                      <IncomingFileProvider>
+                        <Navigation />
+                      </IncomingFileProvider>
                     </UndoProvider>
                   </AppLockGate>
                 </CatchUpProvider>

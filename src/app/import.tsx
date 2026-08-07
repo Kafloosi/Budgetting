@@ -2,7 +2,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import { File } from 'expo-file-system';
 import { useRouter } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/button';
@@ -34,6 +34,7 @@ import {
 } from '@/lib/csv';
 import { useTheme } from '@/hooks/use-theme';
 import { useInvalidateLedger } from '@/providers/ledger';
+import { takePendingImport } from '@/providers/incoming';
 
 /**
  * Reading a bank statement in.
@@ -66,6 +67,62 @@ export default function ImportScreen() {
     waiting: number;
   } | null>(null);
 
+  // A file handed over by the provider is loaded exactly as a picked one is,
+  // so the screen below this line cannot tell the difference. Guarded by a
+  // ref rather than state so it runs at most once, even under StrictMode's
+  // double-invoke or a re-render before the effect settles.
+  const loadedIncoming = useRef(false);
+  useEffect(() => {
+    if (loadedIncoming.current) return;
+    loadedIncoming.current = true;
+    const incoming = takePendingImport();
+    if (incoming) load(incoming.text, incoming.name);
+    // Runs once on mount only: `load` is recreated every render, and the
+    // ref guard above is what makes the dependency array correct at [].
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function load(text: string, name: string) {
+    try {
+      const parsed = parseCsv(text);
+      if (parsed.rows.length === 0) {
+        setError('That file has a heading row but no transactions in it.');
+        return;
+      }
+      setCsv(parsed);
+      setFileName(name);
+      setResult(null);
+      setSavedMapping(null);
+
+      // A format saved from this bank's last export beats guessing at the
+      // headings, so it is applied without asking.
+      findPresetForHeader(db, parsed.header).then((preset) => {
+        if (preset) {
+          setRecognised(preset.name);
+          setPresetName(preset.name);
+          setMapping({
+            date: preset.date_column,
+            amount: preset.amount_column,
+            description: preset.description_column,
+            format: preset.date_format as DateFormat,
+            allNegative: preset.all_negative === 1,
+          });
+          return;
+        }
+        setRecognised(null);
+        setPresetName('');
+        const guessed = guessColumns(parsed.header);
+        setMapping({
+          ...guessed,
+          format: guessDateFormat(parsed.rows.map((row) => row[guessed.date] ?? '')),
+          allNegative: false,
+        });
+      });
+    } catch (readError) {
+      setError(`Could not read that file. ${(readError as Error).message}`);
+    }
+  }
+
   async function pick() {
     setError(null);
     const picked = await DocumentPicker.getDocumentAsync({
@@ -76,41 +133,7 @@ export default function ImportScreen() {
 
     const asset = picked.assets[0];
     try {
-      const text = await new File(asset.uri).text();
-      const parsed = parseCsv(text);
-      if (parsed.rows.length === 0) {
-        setError('That file has a heading row but no transactions in it.');
-        return;
-      }
-      setCsv(parsed);
-      setFileName(asset.name);
-      setResult(null);
-      setSavedMapping(null);
-
-      // A format saved from this bank's last export beats guessing at the
-      // headings, so it is applied without asking.
-      const preset = await findPresetForHeader(db, parsed.header);
-      if (preset) {
-        setRecognised(preset.name);
-        setPresetName(preset.name);
-        setMapping({
-          date: preset.date_column,
-          amount: preset.amount_column,
-          description: preset.description_column,
-          format: preset.date_format as DateFormat,
-          allNegative: preset.all_negative === 1,
-        });
-        return;
-      }
-
-      setRecognised(null);
-      setPresetName('');
-      const guessed = guessColumns(parsed.header);
-      setMapping({
-        ...guessed,
-        format: guessDateFormat(parsed.rows.map((row) => row[guessed.date] ?? '')),
-        allNegative: false,
-      });
+      load(await new File(asset.uri).text(), asset.name);
     } catch (readError) {
       setError(`Could not read that file. ${(readError as Error).message}`);
     }
