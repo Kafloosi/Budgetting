@@ -16,6 +16,7 @@ import { IconTick } from '@/components/transit/icons';
 import { Line, Radius, Space, Stroke } from '@/constants/theme';
 import { exportBackup, exportCsv, restoreBackup } from '@/lib/backup';
 import { decryptBackup, encryptBackup, isEnvelope, type Stage } from '@/lib/backup-crypto';
+import { copyDatabaseAside, discardCopy, strandedCopy } from '@/lib/backup-safety';
 import { toDateOnly } from '@/lib/dates';
 import { packReceipts, receiptsSize, unpackReceipts } from '@/lib/receipts';
 import { useTheme } from '@/hooks/use-theme';
@@ -76,6 +77,9 @@ export default function BackupScreen() {
 
   const [note, setNote] = useState<string | null>(null);
   const [progress, setProgress] = useState<number | null>(null);
+
+  /** Where a previous restore left the old ledger, if it did not finish. */
+  const [stranded, setStranded] = useState<string | null>(() => strandedCopy()?.uri ?? null);
 
   const photos = receiptsSize();
 
@@ -307,7 +311,12 @@ export default function BackupScreen() {
           style: 'destructive',
           onPress: async () => {
             setBusy('restore');
+            let copy: Awaited<ReturnType<typeof copyDatabaseAside>> = null;
             try {
+              setNote('Putting the current ledger aside');
+              await paint();
+              copy = await copyDatabaseAside(db);
+
               const result = await restoreBackup(db, backup);
               // Outside the transaction on purpose: a photo that fails to write
               // is one missing image, while a rolled-back restore is the ledger.
@@ -316,11 +325,19 @@ export default function BackupScreen() {
               // leaving the app showing the replaced phone's currency.
               await update({});
               invalidate();
+              discardCopy();
+              setStranded(null);
               setMessage(
                 `${result.total} rows restored${written > 0 ? `, and ${written} photo${written === 1 ? '' : 's'}` : ''}.`,
               );
             } catch (failure) {
-              setError((failure as Error).message);
+              // The copy is deliberately left where it is. Swapping it back under
+              // a live database handle is how this gets worse.
+              setStranded(copy?.uri ?? null);
+              setError(
+                (failure as Error).message +
+                  (copy ? ' The ledger as it was is still on this phone — see below.' : ''),
+              );
             } finally {
               setBusy(null);
               setNote(null);
@@ -489,6 +506,16 @@ export default function BackupScreen() {
           <Text variant="body" color={theme.onGround.scarlet}>
             {error}
           </Text>
+        ) : null}
+
+        {stranded ? (
+          <View style={[styles.result, { borderColor: Line.scarlet }]}>
+            <Text variant="body" style={styles.resultText}>
+              A restore did not finish. The ledger as it was before it started is still on this
+              phone, at {stranded}. Copy that file somewhere safe before reinstalling Fare — an
+              uninstall deletes it along with everything else.
+            </Text>
+          </View>
         ) : null}
       </ScrollView>
     </Screen>

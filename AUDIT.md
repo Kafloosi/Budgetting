@@ -73,6 +73,11 @@ device), T4 (another app on a rooted device), T5 (the user's own cloud backup).
 verified on a second device, then SQLCipher with a `WHEN_UNLOCKED_THIS_DEVICE_ONLY`
 key, then `allowBackup: false`. The migration must delete `-wal` and `-shm`, not just
 the main file.
+**Step 1 shipped in 0.1.14.0** — `lib/backup-crypto.ts`, Argon2id and AES-256-GCM, with
+the parameters in the file. The database on the phone is still plaintext, so this finding
+stays open; what has changed is that there is now a way off the device that is not, which
+is what the remaining steps are allowed to depend on. Still to do: verify a real backup
+restores onto a second device, then SQLCipher, then `allowBackup: false`.
 **Test that would catch a regression:** a check that `PRAGMA cipher_version` returns
 non-empty on a freshly opened database, run in CI.
 
@@ -149,7 +154,7 @@ drop anything else, before building the statement. Combine with F-05.
 **Test that would catch a regression:** a fixture backup carrying a malicious column
 name; assert the restore refuses and the database is unchanged.
 
-### F-05 · High · Restore trusts the file's shape and cannot be undone — PARTLY FIXED in 0.1.13.0
+### F-05 · High · Restore trusts the file's shape and cannot be undone — FIXED in 0.1.14.1
 
 **Where:** `src/lib/backup.ts:61-98`.
 **What happens:** only `app` and `format` are checked. Types are not: `amount_cents`
@@ -161,11 +166,20 @@ the existing ledger with nothing to roll back to.
 deleted and refuses a wrong `app`, a future `format`, a non-list table, a non-record
 row, an unknown field, a non-scalar value, a missing or duplicated id, and any cents
 column that is not a whole number.
-**Still outstanding:** the database file is not copied aside first, so a restore that
-fails *after* validation — a disk error mid-write — still has nothing to roll back to.
-The transaction covers SQLite-level failure; it does not cover the file. Do this with
-the encrypted-export work in §4.3, where the copy has a second purpose.
-**Regression test:** `scripts/check-backup.mjs`, 14 malformed fixtures.
+**Second half, in 0.1.14.1:** `lib/backup-safety.ts` checkpoints the write-ahead log and
+copies `budget.db` aside before the first row is deleted, then deletes the copy once the
+restore has finished. A copy still present means the restore did not, and the backup
+screen says so with the path — it survives the app being killed, which is the case it
+exists for. The checkpoint is the load-bearing part: in WAL mode the `.db` file on its
+own is a snapshot from some point in the past, so copying it without folding the log in
+first would have produced a rollback that silently loses the most recent entries.
+
+What it deliberately does not do is swap the copy back automatically. expo-sqlite holds
+an open handle, and replacing the file underneath it turns a recoverable problem into an
+unrecoverable one.
+**Regression test:** `scripts/check-backup.mjs`, 14 malformed fixtures. The copy-aside
+itself is not covered — it is filesystem and connection state, which is exactly the kind
+of thing these checks cannot reach without a device.
 
 ### F-06 · High · CSV export lets a merchant name become a formula — FIXED in 0.1.13.0
 
@@ -238,6 +252,9 @@ touch them, and they are excluded from the JSON backup, so they are neither prot
 nor preserved.
 **Proposed fix:** decide deliberately in Phase 1 — encrypt them individually with the
 database key, or state plainly that they are not protected.
+**Half of it in 0.1.14.0:** photos now travel inside the encrypted export, so they are no
+longer lost on a restore and no longer leave the device in the clear. At rest on the phone
+they are still plaintext files, and that is SQLCipher's step to answer, not this one.
 
 ## New findings not anticipated by the programme
 

@@ -1,7 +1,7 @@
 {
   "name": "budgetting",
   "main": "expo-router/entry",
-  "version": "0.1.14.0",
+  "version": "0.1.14.1",
   "dependencies": {
     "@expo/ui": "~57.0.9",
     "@noble/ciphers": "^2.2.0",
