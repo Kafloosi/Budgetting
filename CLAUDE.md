@@ -52,6 +52,17 @@ npm run check              # money, dedupe, schema, ledger arithmetic
 - Budgets: a `YYYY-MM` row beats the recurring row.
 - Import rules fill an empty category only. Never overwrite one set by hand.
 
+## The release workflow
+
+`.github/workflows/android.yml` holds the four signing secrets. Losing the keystore ends the upgrade path for every user.
+
+- Every `uses:` is pinned to a 40-character commit SHA. Never a tag.
+- To move one: `gh api repos/<owner>/<repo>/commits/<tag> --jq .sha`.
+- Top-level `permissions` stays `contents: read`. Only the `release` job gets `write`.
+- The `release` job runs no repository code. No `npm`, no Gradle, no prebuild.
+- Never interpolate a secret into a `run:` line. Pass it via `env:`.
+- `npm run check:workflow` enforces all of this.
+
 ## Design
 
 Direction contract: the comment at the top of `src/app/_layout.tsx`. Keep it true.
