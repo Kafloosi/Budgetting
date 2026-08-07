@@ -23,17 +23,22 @@ npm run android    # emulator
 npm run web
 npm run typecheck
 npm run lint
-npm run check:migrations   # after touching db/migrations.ts
+npm run check              # money, dedupe, schema, ledger arithmetic
 ```
 
-- No tests exist. `typecheck` + `lint` are the only checks.
-- `check:migrations` replays the schema and refuses an edit to a shipped migration. Run it with `--update` once a new one is final.
+- No test runner. `typecheck`, `lint` and `check` are the checks. Run all three before committing.
+- `npm run check` runs `scripts/check-*.mjs` on Node alone, no dependency.
+- `check:migrations` refuses an edit to a shipped migration. Run it with `--update` once a new one is final.
+- Touching `lib/money.ts`, `lib/fingerprint.ts`, `db/migrations.ts`, or any aggregate in `db/repositories/` means running `npm run check` and adding a case to the matching file.
 - Fresh clone: `npm start` once first. It makes `expo-env.d.ts`.
 - No iOS builds here. Use Expo Go on a real iPhone.
 
 ## Rules
 
-- Money is whole cents. Never floats. Text conversion only in `lib/money.ts`.
+- Money is whole cents. **Never a float, not even briefly.** Parse digits as a string. Conversion only in `lib/money.ts`.
+- `1.234` is Dutch thousands, not one euro twenty-three. Do not "fix" it.
+- A trailing minus is a debit. `12,34-` is negative.
+- Import fingerprints come from `lib/fingerprint.ts`. `nth === 0` must stay byte-identical to `date|cents|description` or every stored hash breaks.
 - Amounts are signed. Expenses negative, income positive. Totals are `SUM`. Spend uses `SUM(-amount_cents)`.
 - IDs are UUIDs — `newId()`.
 - Deletes are soft. Always `WHERE deleted_at IS NULL`.
@@ -74,7 +79,7 @@ One change, one commit:
 
 1. Bump the version in `package.json`, `app.json` and `package-lock.json`. Same commit.
 2. Bump `android.versionCode` in `app.json` when the commit is meant to be installed.
-3. `npm run typecheck` and `npm run lint`. Both must exit 0.
+3. `npm run typecheck`, `npm run lint` and `npm run check`. All must exit 0.
 4. Push.
 
 "Done" means it works, not that the edit landed.

@@ -18,14 +18,14 @@
  */
 
 import { DatabaseSync } from 'node:sqlite';
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { writeFileSync, existsSync, readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
+import { loadMigrations } from './lib/schema.mjs';
+
 const HERE = dirname(fileURLToPath(import.meta.url));
-const ROOT = join(HERE, '..');
-const SOURCE = join(ROOT, 'src/db/migrations.ts');
 const LOCK = join(HERE, 'migrations.lock.json');
 
 const update = process.argv.includes('--update');
@@ -41,33 +41,7 @@ const SYNCABLE_COLUMNS = ['id', 'household_id', 'created_at', 'updated_at', 'del
 const problems = [];
 const fail = (message) => problems.push(message);
 
-// ── Read the migrations ──────────────────────────────────────────────────────
-//
-// Regex rather than a parser, so this stays dependency-free. Line comments are
-// dropped first because they contain backticks (`recurring_id`) that would
-// otherwise be read as string delimiters and split a migration in half. SQL in
-// this file uses `--` comments, which are left alone.
-
-const source = readFileSync(SOURCE, 'utf8');
-const start = source.indexOf('const MIGRATIONS: string[] = [');
-if (start === -1) {
-  console.error('Could not find the MIGRATIONS array in src/db/migrations.ts.');
-  process.exit(1);
-}
-const end = source.indexOf('\n];', start);
-const body = source
-  .slice(start, end)
-  .split('\n')
-  .filter((line) => !/^\s*\/\//.test(line))
-  .join('\n');
-
-const migrations = [...body.matchAll(/`([\s\S]*?)`/g)].map((match) => match[1]);
-
-if (migrations.length === 0) {
-  console.error('Found the MIGRATIONS array but no migrations in it.');
-  process.exit(1);
-}
-
+const migrations = loadMigrations();
 console.log(`${migrations.length} migrations`);
 
 // ── Append-only guard ────────────────────────────────────────────────────────
