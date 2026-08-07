@@ -2,7 +2,7 @@
   "expo": {
     "name": "Fare",
     "slug": "Budgetting",
-    "version": "0.1.11.0",
+    "version": "0.1.12.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "fare",
@@ -20,8 +20,19 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": true
+      "predictiveBackGestureEnabled": true,
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": false,
+          "data": [
+            {
+              "scheme": "fare"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     },
     "web": {
       "output": "static",
@@ -54,7 +65,8 @@
           "photosPermission": "Fare attaches a photo of a receipt to an entry. Photos stay on this phone.",
           "cameraPermission": "Fare uses the camera to photograph a receipt. Photos stay on this phone."
         }
-      ]
+      ],
+      "./plugins/with-quick-add-shortcut"
     ],
     "experiments": {
       "typedRoutes": true,

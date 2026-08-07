@@ -23,6 +23,8 @@ export interface PlateProps {
   label: string;
   active: boolean;
   onPress: () => void;
+  /** A secondary action on the same control — removing a saved filter, say. */
+  onLongPress?: () => void;
   /**
    * The colour of the selected state. Defaults to ink — a neutral selection.
    * Pass a route colour when the plate belongs to a specific line.
@@ -47,6 +49,7 @@ export function Plate({
   label,
   active,
   onPress,
+  onLongPress,
   accent,
   detail,
   leading,
@@ -67,6 +70,7 @@ export function Plate({
   return (
     <Pressable
       onPress={onPress}
+      onLongPress={onLongPress}
       accessibilityRole={role}
       accessibilityState={{ selected: active }}
       style={({ pressed }) => [

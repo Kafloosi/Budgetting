@@ -341,6 +341,36 @@ const MIGRATIONS: string[] = [
   `
   ALTER TABLE transactions ADD COLUMN receipt_file TEXT;
   `,
+
+  // 12 — a filter worth keeping
+  //
+  // The ledger already holds a search, a direction, a line and a month-or-everything
+  // scope in component state. Naming a combination is the whole feature; nothing new
+  // is computed.
+  //
+  // category_id is a real reference with ON DELETE SET NULL, so closing a line leaves
+  // the filter pointing at every line rather than at a line that no longer exists.
+  `
+  CREATE TABLE saved_filters (
+    id           TEXT PRIMARY KEY NOT NULL,
+    household_id TEXT,
+    name         TEXT NOT NULL,
+    search       TEXT,
+    direction    TEXT NOT NULL DEFAULT 'all'
+                 CHECK (direction IN ('all', 'in', 'out')),
+    category_id  TEXT REFERENCES categories(id) ON DELETE SET NULL,
+    scope        TEXT NOT NULL DEFAULT 'month'
+                 CHECK (scope IN ('month', 'all')),
+    sort_order   INTEGER NOT NULL DEFAULT 0,
+    created_at   TEXT NOT NULL,
+    updated_at   TEXT NOT NULL,
+    deleted_at   TEXT
+  );
+
+  CREATE UNIQUE INDEX idx_saved_filters_name
+    ON saved_filters(name COLLATE NOCASE)
+    WHERE deleted_at IS NULL;
+  `,
 ];
 
 /** Categories a new install starts with, so the app is usable immediately. */

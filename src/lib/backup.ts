@@ -21,6 +21,7 @@ const TABLES = [
   'budgets',
   'import_rules',
   'import_presets',
+  'saved_filters',
   'recurring_rules',
   'goals',
   'templates',

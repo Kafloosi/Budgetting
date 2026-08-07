@@ -1,8 +1,9 @@
 import { useRouter } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useMemo, useState } from 'react';
-import { ScrollView, SectionList, StyleSheet, TextInput, View } from 'react-native';
+import { Alert, ScrollView, SectionList, StyleSheet, TextInput, View } from 'react-native';
 
+import { Button } from '@/components/button';
 import { EmptyState } from '@/components/empty-state';
 import { Field } from '@/components/field';
 import { Money } from '@/components/money';
@@ -15,6 +16,12 @@ import { IconSearch } from '@/components/transit/icons';
 import { CategoryRoundel } from '@/components/transit/roundel';
 import { Line, Radius, Space, Stroke, TouchTarget } from '@/constants/theme';
 import { listCategories } from '@/db/repositories/categories';
+import {
+  deleteSavedFilter,
+  listSavedFilters,
+  saveFilter,
+  type SavedFilter,
+} from '@/db/repositories/saved-filters';
 import {
   deleteTransaction,
   listTransactions,
@@ -50,9 +57,52 @@ export default function LedgerScreen() {
   const [direction, setDirection] = useState<Direction>('all');
   const [scope, setScope] = useState<Scope>('month');
   const [searchFocused, setSearchFocused] = useState(false);
+  const [naming, setNaming] = useState(false);
+  const [filterName, setFilterName] = useState('');
 
   const month = toMonthKey(new Date());
   const categories = useLedgerQuery((database) => listCategories(database), []);
+  const saved = useLedgerQuery((database) => listSavedFilters(database), []);
+
+  /** Anything other than the default view is worth being able to keep. */
+  const filtered =
+    search.trim().length > 0 || categoryId !== null || direction !== 'all' || scope !== 'month';
+
+  function applySaved(filter: SavedFilter) {
+    setSearch(filter.search ?? '');
+    setCategoryId(filter.category_id);
+    setDirection(filter.direction);
+    setScope(filter.scope);
+  }
+
+  async function keepFilter() {
+    const name = filterName.trim();
+    if (!name) return;
+    await saveFilter(db, {
+      name,
+      search: search.trim() || null,
+      direction,
+      category_id: categoryId,
+      scope,
+    });
+    setNaming(false);
+    setFilterName('');
+    invalidate();
+  }
+
+  function forgetFilter(filter: SavedFilter) {
+    Alert.alert(`Forget "${filter.name}"?`, 'The transactions are untouched.', [
+      { text: 'Keep', style: 'cancel' },
+      {
+        text: 'Forget',
+        style: 'destructive',
+        onPress: async () => {
+          await deleteSavedFilter(db, filter.id);
+          invalidate();
+        },
+      },
+    ]);
+  }
   const transactions = useLedgerQuery(
     (database) =>
       listTransactions(database, {
@@ -158,6 +208,65 @@ export default function LedgerScreen() {
             />
           ))}
         </ScrollView>
+
+        {(saved.data ?? []).length > 0 ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filters}>
+            {(saved.data ?? []).map((filter) => (
+              <FilterChip
+                key={filter.id}
+                label={filter.name}
+                active={false}
+                color={theme.onGround.cobalt}
+                onPress={() => applySaved(filter)}
+                onLongPress={() => forgetFilter(filter)}
+              />
+            ))}
+          </ScrollView>
+        ) : null}
+
+        {naming ? (
+          <View style={styles.naming}>
+            <Field label="Call this filter" focused>
+              <TextInput
+                value={filterName}
+                onChangeText={setFilterName}
+                placeholder="Dining out this month"
+                placeholderTextColor={theme.inkMuted}
+                selectionColor={theme.focus}
+                accessibilityLabel="Name for this filter"
+                autoFocus
+                returnKeyType="done"
+                onSubmitEditing={keepFilter}
+                style={[styles.searchInput, { color: theme.ink }]}
+              />
+            </Field>
+            <View style={styles.namingActions}>
+              <Button
+                label="Cancel"
+                variant="quiet"
+                showArrow={false}
+                onPress={() => setNaming(false)}
+                style={styles.namingAction}
+              />
+              <Button
+                label="Keep it"
+                onPress={keepFilter}
+                disabled={filterName.trim().length === 0}
+                style={styles.namingAction}
+              />
+            </View>
+          </View>
+        ) : filtered ? (
+          <Button
+            label="Keep this filter"
+            variant="quiet"
+            showArrow={false}
+            onPress={() => setNaming(true)}
+          />
+        ) : null}
       </View>
 
       <SectionList
@@ -235,12 +344,14 @@ function FilterChip({
   color,
   icon,
   onPress,
+  onLongPress,
 }: {
   label: string;
   active: boolean;
   color: string;
   icon?: string;
   onPress: () => void;
+  onLongPress?: () => void;
 }) {
   return (
     <Plate
@@ -252,6 +363,7 @@ function FilterChip({
       label={label}
       active={active}
       onPress={onPress}
+      onLongPress={onLongPress}
       leading={
         icon ? (
           <CategoryRoundel size={22} color={color} icon={icon} name={label} />
@@ -305,6 +417,16 @@ const styles = StyleSheet.create({
     gap: Space.sm,
     paddingRight: Space.xl,
     alignItems: 'center',
+  },
+  naming: {
+    gap: Space.sm,
+  },
+  namingActions: {
+    flexDirection: 'row',
+    gap: Space.sm,
+  },
+  namingAction: {
+    flex: 1,
   },
   filterDivider: {
     width: Stroke.hairline,
