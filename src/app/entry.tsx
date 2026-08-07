@@ -292,6 +292,17 @@ export default function EntryScreen() {
           </View>
         ) : null}
 
+        {id && loaded && !loaded.transfer_group_id ? (
+          <View style={styles.splitAction}>
+            <Button
+              label={loaded.split_group_id ? 'Change the split' : 'Split across lines'}
+              variant="quiet"
+              showArrow={false}
+              onPress={() => router.push({ pathname: '/split', params: { id } })}
+            />
+          </View>
+        ) : null}
+
         {showAccounts ? (
           <View style={styles.rail}>
             <Text variant="station" tone="muted" style={styles.railLabel}>
@@ -410,6 +421,9 @@ const styles = StyleSheet.create({
   },
   rail: {
     gap: Space.sm,
+  },
+  splitAction: {
+    paddingHorizontal: Space.lg,
   },
   accountRow: {
     gap: Space.sm,

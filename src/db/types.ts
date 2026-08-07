@@ -87,6 +87,14 @@ export interface Transaction extends SyncableRecord {
    * shows up as earning it.
    */
   transfer_group_id: string | null;
+  /**
+   * Shared by the parts of one payment divided across categories.
+   *
+   * The parts add up to what was paid, so no aggregate needs to know about them —
+   * unlike a parent row holding the total, which every aggregate would have to
+   * exclude.
+   */
+  split_group_id: string | null;
 }
 
 export type RecurringFrequency = 'weekly' | 'biweekly' | 'monthly';

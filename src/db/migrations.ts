@@ -309,6 +309,24 @@ const MIGRATIONS: string[] = [
   CREATE INDEX idx_transactions_transfer ON transactions(transfer_group_id)
     WHERE transfer_group_id IS NOT NULL AND deleted_at IS NULL;
   `,
+
+  // 10 — one receipt across several lines
+  //
+  // A supermarket shop is groceries and household and possibly wine. Splitting it
+  // uses the same shape as a transfer and for the same reason: sibling rows sharing
+  // a group id, no parent. The parts add up to the original, so every existing
+  // aggregate stays correct with no exclusion to remember — whereas a parent row
+  // holding the total would have to be filtered out of every one of them, and a
+  // single missed filter would count the receipt twice.
+  //
+  // The original `import_hash` stays on exactly one part, so re-importing the
+  // statement the row came from still collides and still does nothing.
+  `
+  ALTER TABLE transactions ADD COLUMN split_group_id TEXT;
+
+  CREATE INDEX idx_transactions_split ON transactions(split_group_id)
+    WHERE split_group_id IS NOT NULL AND deleted_at IS NULL;
+  `,
 ];
 
 /** Categories a new install starts with, so the app is usable immediately. */
