@@ -19,6 +19,7 @@ const CHECKS = [
   'check-fingerprint.mjs',
   'check-ledger.mjs',
   'check-backup.mjs',
+  'check-backup-crypto.mjs',
   'check-workflow.mjs',
 ];
 

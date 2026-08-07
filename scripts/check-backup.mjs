@@ -15,7 +15,7 @@ import { importSource } from './lib/schema.mjs';
 // backup-format.ts rather than backup.ts: the latter reaches SQLite through
 // @/db/util, which pulls expo-crypto and cannot load outside the app. The rules are
 // in the format file precisely so they can be checked.
-const { csvCell, BACKUP_COLUMNS, validateBackup } = await importSource(
+const { csvCell, BACKUP_COLUMNS, isSafeReceiptName, validateBackup } = await importSource(
   'src/lib/backup-format.ts',
 );
 
@@ -111,6 +111,51 @@ check(
   'settings rows have no id and must still be accepted',
   validateBackup({ app: 'fare', format: 1, tables: { settings: [{ key: 'currency', value: 'EUR' }] } }).ok,
   true,
+);
+
+section('A receipt name from a backup cannot escape the receipts folder');
+// The name is joined onto a directory path at restore time, so this is the same
+// class of defect as F-04: content from the file reaching somewhere it is treated
+// as structure rather than data.
+for (const hostile of [
+  '../../databases/budget.db',
+  '..',
+  '../secrets.txt',
+  '/etc/passwd',
+  'a/b.jpg',
+  'a\\b.jpg',
+  '.hidden',
+  '',
+  'a'.repeat(200),
+  null,
+  42,
+]) {
+  check(`${JSON.stringify(hostile)} is refused`, isSafeReceiptName(hostile), false);
+}
+check('a name Fare writes is accepted', isSafeReceiptName('0f8d2c1a-4b7e.jpg'), true);
+
+section('...and the whole receipts section is validated before a row is deleted');
+const withReceipts = (receipts) => validateBackup({ app: 'fare', format: 1, tables: {}, receipts });
+
+check('no receipts section at all is fine', validateBackup({ app: 'fare', format: 1, tables: {} }).ok, true);
+check('an empty list is fine', withReceipts([]).ok, true);
+check('a good receipt is accepted', withReceipts([{ name: 'a1.jpg', base64: 'AAAA' }]).ok, true);
+check('a receipts section that is not a list', withReceipts({}).ok, false);
+check('a receipt that is not a record', withReceipts(['a.jpg']).ok, false);
+check('a traversing name', withReceipts([{ name: '../x.jpg', base64: 'AAAA' }]).ok, false);
+check('a receipt with no image data', withReceipts([{ name: 'a1.jpg' }]).ok, false);
+check(
+  'a receipt with an unknown field',
+  withReceipts([{ name: 'a1.jpg', base64: 'AAAA', uri: 'file:///x' }]).ok,
+  false,
+);
+check(
+  'two receipts with the same name',
+  withReceipts([
+    { name: 'a1.jpg', base64: 'AAAA' },
+    { name: 'a1.jpg', base64: 'BBBB' },
+  ]).ok,
+  false,
 );
 
 report('backup');

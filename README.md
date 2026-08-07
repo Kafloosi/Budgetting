@@ -38,7 +38,7 @@ via the Expo Go app over Wi-Fi.
 | Bank CSV import, bank-agnostic column mapping | Built |
 | Stats — six months, or a full year by line | Built |
 | Trash with 30-day recovery, undo on delete | Built |
-| JSON backup and restore, CSV export | Built |
+| Encrypted backup and restore, receipts included, CSV export | Built |
 | App lock via the phone's own biometrics | Built |
 | Budget alert notifications | Not started |
 | Receipt photos | Not started |
@@ -89,6 +89,7 @@ src/
   lib/
     money.ts            cents <-> display strings, input parsing
     dates.ts            month and day maths
+    backup-crypto.ts      the encrypted envelope: argon2id + aes-256-gcm
     csv.ts, backup.ts, forecast.ts, insights.ts, currencies.ts, haptics.ts
 scripts/
   make-icons.mjs        the roundel, as app icon and splash
@@ -122,6 +123,37 @@ statement is a no-op rather than a pile of duplicates.
 **Budgets fall back from specific to recurring.** A budget row with a null
 `month` is the recurring limit applied to every month; a `YYYY-MM` value
 overrides just that month.
+
+## The backup file
+
+A backup is the whole ledger in the most portable form it has, so it is encrypted
+with a passphrase by default. Receipt photos go inside it, base64 within the
+ciphertext — they are the one thing the user photographed *because* it mattered,
+and a restore that drops them hands back a ledger with holes.
+
+The file names everything needed to open it, because an app that stops working
+must not take the data with it:
+
+```jsonc
+{
+  "format": "fare-backup",
+  "version": 1,
+  "kdf":    { "name": "argon2id", "salt": "<b64>", "m": 65536, "t": 3, "p": 1 },
+  "cipher": { "name": "aes-256-gcm", "nonce": "<b64>" },
+  "ciphertext": "<b64>",
+  "tag": "<b64>"
+}
+```
+
+Argon2id over the passphrase gives a 32-byte key; AES-256-GCM over the UTF-8
+JSON gives the ciphertext, with the tag stored separately. `check-backup-crypto`
+proves the claim by decrypting a Fare backup with Node's own WebCrypto and no
+code from `src/`.
+
+The parameters live in the file rather than in the source, so a later version can
+raise the cost without stranding an old backup. The passphrase is stored nowhere
+and there is no recovery — the screen says so before one is typed. A plain,
+readable export is still available behind a warning, and leaves photos out.
 
 ## Getting started
 

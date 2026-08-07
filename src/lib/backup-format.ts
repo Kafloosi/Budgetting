@@ -29,11 +29,39 @@ export const TABLES = [
 export type TableName = (typeof TABLES)[number];
 export type Row = Record<string, string | number | null>;
 
+/** A receipt photo, carried as base64 because a backup is one file. */
+export interface ReceiptEntry {
+  /** The stored file name, which is what `transactions.receipt_file` holds. */
+  name: string;
+  base64: string;
+}
+
 export interface Backup {
   format: number;
   app: 'fare';
   exported_at: string;
   tables: Record<TableName, Row[]>;
+  /**
+   * Absent in a plain backup and in every file written before 0.1.14.0.
+   *
+   * Photos used to be left out because base64 turns 200 KB into tens of
+   * megabytes. Now that a backup is encrypted, leaving them out would mean the
+   * one asset class the user photographed *because it mattered* stays on the
+   * phone in the clear and is lost on a restore. The size is the price.
+   */
+  receipts?: ReceiptEntry[];
+}
+
+/**
+ * A receipt name a restore may write.
+ *
+ * The name comes out of the backup file and is joined onto a directory path, so
+ * without this a crafted backup writes wherever it likes — `../../databases/
+ * budget.db` being the interesting one. Names Fare writes are `<uuid>.<ext>`, so
+ * this is deliberately narrower than what a filesystem would accept.
+ */
+export function isSafeReceiptName(name: unknown): name is string {
+  return typeof name === 'string' && /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(name) && !name.includes('..');
 }
 
 const SYNCABLE = ['id', 'household_id', 'created_at', 'updated_at', 'deleted_at'] as const;
@@ -181,6 +209,35 @@ export function validateBackup(file: unknown): ValidationResult {
         return { ok: false, problem: `Two rows in ${table} share the id ${id}.` };
       }
       seenIds.add(id);
+    }
+  }
+
+  if (backup.receipts !== undefined) {
+    if (!Array.isArray(backup.receipts)) {
+      return { ok: false, problem: 'The receipts section of that backup is not a list.' };
+    }
+
+    const seenNames = new Set<string>();
+    for (const receipt of backup.receipts) {
+      if (typeof receipt !== 'object' || receipt === null || Array.isArray(receipt)) {
+        return { ok: false, problem: 'A receipt in that backup is not a record.' };
+      }
+      for (const field of Object.keys(receipt)) {
+        if (field !== 'name' && field !== 'base64') {
+          return { ok: false, problem: `A receipt in that backup has an unknown field "${field}".` };
+        }
+      }
+      if (!isSafeReceiptName((receipt as ReceiptEntry).name)) {
+        return { ok: false, problem: 'A receipt in that backup has a file name Fare will not write.' };
+      }
+      if (typeof (receipt as ReceiptEntry).base64 !== 'string') {
+        return { ok: false, problem: 'A receipt in that backup has no image data.' };
+      }
+      const name = (receipt as ReceiptEntry).name;
+      if (seenNames.has(name)) {
+        return { ok: false, problem: `Two receipts in that backup are called ${name}.` };
+      }
+      seenNames.add(name);
     }
   }
 

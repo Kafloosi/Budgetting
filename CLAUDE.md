@@ -49,6 +49,8 @@ npm run check              # money, dedupe, schema, ledger arithmetic
 - Every ledger table carries `id`, `household_id`, `created_at`, `updated_at`, `deleted_at`. Only `settings` is exempt.
 - A unique index must exclude soft-deleted rows.
 - Imports dedupe on a content hash: date + amount + cleaned description.
+- A backup is encrypted by default. **A restore reads the Argon2 parameters out of the file, never from `KDF_PARAMS`** — reading them from the source strands every backup written before the cost was raised.
+- A receipt name from a backup is joined onto a path. It goes through `isSafeReceiptName` first, every time.
 - Budgets: a `YYYY-MM` row beats the recurring row.
 - Import rules fill an empty category only. Never overwrite one set by hand.
 

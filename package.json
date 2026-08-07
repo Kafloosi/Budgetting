@@ -1,9 +1,11 @@
 {
   "name": "budgetting",
   "main": "expo-router/entry",
-  "version": "0.1.13.4",
+  "version": "0.1.14.0",
   "dependencies": {
     "@expo/ui": "~57.0.9",
+    "@noble/ciphers": "^2.2.0",
+    "@noble/hashes": "^2.3.0",
     "expo": "~57.0.10",
     "expo-constants": "~57.0.9",
     "expo-crypto": "~57.0.1",
@@ -57,6 +59,7 @@
     "check:fingerprint": "node ./scripts/check-fingerprint.mjs",
     "check:ledger": "node ./scripts/check-ledger.mjs",
     "check:backup": "node ./scripts/check-backup.mjs",
+    "check:backup-crypto": "node ./scripts/check-backup-crypto.mjs",
     "check:workflow": "node ./scripts/check-workflow.mjs"
   },
   "private": true
