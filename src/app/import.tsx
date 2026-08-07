@@ -21,13 +21,8 @@ import {
   saveImportPreset,
 } from '@/db/repositories/import-presets';
 import { loadRuleMatcher } from '@/db/repositories/import-rules';
-import {
-  bulkInsertImported,
-  countUncategorised,
-  type TransactionInput,
-} from '@/db/repositories/transactions';
+import { bulkInsertImported, countUncategorised } from '@/db/repositories/transactions';
 import { importHash } from '@/db/hash';
-import { assignOrdinals } from '@/lib/fingerprint';
 import {
   DATE_FORMAT_LABELS,
   guessColumns,
@@ -39,6 +34,7 @@ import {
   type Mapping,
   type ParsedCsv,
 } from '@/lib/csv';
+import { buildImportInputs } from '@/lib/import-run';
 import { useTheme } from '@/hooks/use-theme';
 import { useInvalidateLedger } from '@/providers/ledger';
 
@@ -159,33 +155,9 @@ export default function ImportScreen() {
     if (!csv || !mapping || busy) return;
     setBusy(true);
     try {
-      const drafts = csv.rows
-        .map((row) => toDraft(row, mapping))
-        .filter((draft): draft is Draft => draft !== null);
-
       // Loaded once for the whole statement rather than queried per row.
       const matchCategory = await loadRuleMatcher(db);
-
-      // Two identical coffees on one day are two transactions. Numbering each row
-      // by how many identical ones preceded it in this file is what tells them
-      // apart, while a re-import of the same file reproduces the same numbers and
-      // so still collides with itself.
-      const inputs: TransactionInput[] = [];
-      for (const draft of assignOrdinals(drafts)) {
-        inputs.push({
-          amount_cents: draft.amount_cents,
-          date: draft.date,
-          description: draft.description,
-          category_id: matchCategory(draft.description),
-          source: 'import',
-          import_hash: await importHash(
-            draft.date,
-            draft.amount_cents,
-            draft.description,
-            draft.nth,
-          ),
-        });
-      }
+      const { inputs } = await buildImportInputs(csv.rows, mapping, matchCategory, importHash);
 
       const outcome = await bulkInsertImported(db, inputs);
       invalidate();
