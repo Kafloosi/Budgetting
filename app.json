@@ -2,14 +2,24 @@
   "expo": {
     "name": "Fare",
     "slug": "Budgetting",
-    "version": "0.2.0.4",
+    "version": "0.2.0.5",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "fare",
     "userInterfaceStyle": "automatic",
     "backgroundColor": "#0A1330",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "CFBundleDocumentTypes": [
+          {
+            "CFBundleTypeName": "Comma-separated values",
+            "CFBundleTypeRole": "Viewer",
+            "LSHandlerRank": "Alternate",
+            "LSItemContentTypes": ["public.comma-separated-values-text"]
+          }
+        ]
+      }
     },
     "android": {
       "package": "com.kafloosi.fare",
@@ -31,6 +41,15 @@
             }
           ],
           "category": ["BROWSABLE", "DEFAULT"]
+        },
+        {
+          "action": "VIEW",
+          "category": ["DEFAULT", "BROWSABLE"],
+          "data": [
+            { "mimeType": "text/csv" },
+            { "mimeType": "text/comma-separated-values" },
+            { "mimeType": "application/csv" }
+          ]
         }
       ]
     },

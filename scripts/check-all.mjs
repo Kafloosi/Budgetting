@@ -18,6 +18,7 @@ const CHECKS = [
   'check-money.mjs',
   'check-fingerprint.mjs',
   'check-import-run.mjs',
+  'check-app-config.mjs',
   'check-ledger.mjs',
   'check-backup.mjs',
   'check-workflow.mjs',
