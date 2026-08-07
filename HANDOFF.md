@@ -1,159 +1,153 @@
 # Handoff
 
-Updated: 2026-08-05 · version 0.1.2.12
+Updated: 2026-08-07 · version 0.1.13.3 · `main` at 24e6135
 
 ## Read this first
 
-**The Android build works.** A signed APK builds end to end:
-https://github.com/Kafloosi/Budgetting/actions/runs/31027616779 — `BUILD
-SUCCESSFUL in 23m 29s`, JS bundle verified inside, 54.1 MB artifact.
+**Your local checkout is behind.** This session worked in a git worktree and pushed
+everything to `main`; the primary checkout was never fast-forwarded. Run `git pull` in
+`2026/Budgetting` before anything else. The worktree at
+`.claude/worktrees/release-0.1.3.0` on branch `worktree-release-0.1.3.0` is fully
+contained in `main` and can be removed.
 
-**Everything is on `main`.** PR #1 (CSV import fixes) and PR #2 (the build fix)
-both merged, and this commit merges the whole `0.1.2.x` release line into `main`
-as well. One trunk again, at `0.1.2.12`.
+**Two releases have shipped**, both signed, both verified:
 
-The merge conflicted only on the version fields in `package.json` and `app.json`
-— `0.1.2.11` against `0.1.1.6`. Everything else auto-merged, including
-`db/repositories/transactions.ts`, which each line had edited: the release line
-moved `monthBounds` to `@/lib/dates`, and `main` replaced the comma-operator
-assignments with a local `set()`. Both survived. `typecheck` and `lint` are clean
-on the result.
+- `v0.1.3.0` — the first installable Fare
+- `v0.1.6.1` — versionCode 3, installs over it and keeps the ledger
 
-`worktree-android-release-build` is now fully contained in `main` and can be
-deleted, along with the merged `audit-fixes` and `fix-apk-signing`.
+**`npm run check` exists now.** Six files, 116 assertions, on Node alone with no
+dependency and no test runner. Run it with `typecheck` and `lint` before every commit.
+`CLAUDE.md`'s old "no tests exist" line is gone.
 
 ## Where we left off
 
-### 1. The APK build — fixed
+Forty commits. Three things happened, in this order.
 
-The previous handoff said "the four repository secrets are set and confirmed
-working". **They were not.** `gh secret list` returned exactly one secret,
-`PKCS12`. That single wrong sentence is why the failure looked like a keystore
-problem for a whole session.
+### 1. Twelve features, 0.1.3.1 → 0.1.12.0
 
-Two faults, both invisible until Gradle's last task:
+Every one verified against a real SQLite database via `node:sqlite` before shipping.
 
-- Three of the four secrets did not exist. An unset secret arrives as an empty
-  string, not an error, so `echo "" | base64 -d` wrote a zero-byte file and the
-  build spent 17m48s getting to it before dying on `Tag number over 30 is not
-  supported` — an ASN.1 parse error on nothing.
-- The `PKCS12` secret was not valid base64 at all. The local
-  `C:\Users\luuks\fare-release.b64` is perfect and decodes byte-identical to the
-  `.p12`, so the value was damaged on its way *into* GitHub.
+| Version | What |
+| --- | --- |
+| `0.1.3.1` | One `components/plate.tsx` replacing nine copies, −400 lines |
+| `0.1.3.2` | `Mapping`/`Draft`/`toDraft` into `lib/csv.ts` |
+| `0.1.4.0` | Import rules, rule editor, triage queue |
+| `0.1.5.0` | Statement formats recognised by header signature (migration 6) |
+| `0.1.6.0` | Rollover budgets (migration 7) |
+| `0.1.7.0` | Budget alerts at 80% and over |
+| `0.1.8.0` | Accounts surfaced and backfilled (migration 8) |
+| `0.1.9.0` | Transfers (migration 9) |
+| `0.1.10.0` | Splits (migration 10) |
+| `0.1.11.0` | Receipt photos (migration 11) |
+| `0.1.12.0` | Saved filters (migration 12), Android quick-add shortcut |
 
-What changed in `.github/workflows/android.yml`:
+**Testing changed three designs rather than confirming them.** Worth knowing, because
+the reasoning is not visible in the final code:
 
-- The restore step decodes and inspects the keystore **before** looking at
-  credentials, so a half-configured repo still learns whether its keystore is
-  sound. In order: missing keystore secret → won't base64-decode → no DER
-  `SEQUENCE` header → missing password/alias → `keytool -list` rejects it. Two
-  seconds, and the message names which.
-- `PKCS12` is read as a fallback for `ANDROID_KEYSTORE_BASE64`. Secrets cannot be
-  renamed, only recreated, and re-pasting a release keystore to relabel it is a
-  good way to lose one.
-- `checkout@v7`, `setup-node@v7`, `setup-java@v5` — clears the Node 20
-  deprecation warnings. `java-version: 17` unchanged; the action major and the
-  JDK it installs are separate things.
-- `README.md` now documents the base64 encoding it never did. A `.p12` is binary
-  and reading it as text corrupts it silently.
+- Rollover would have credited €1800 the moment you enabled it, from eight quiet months
+  nobody was budgeting against. Hence `rollover_since` — counting starts when the switch
+  is flipped.
+- Migration 8 first skipped trashed rows, so restoring from trash would have produced a
+  transaction with no account: the one state the rest of the app now assumes impossible.
+- The transfer guard is proven load-bearing — without it income reads 50000 instead of
+  30000 in `check-ledger`.
 
-All four secrets are set and **verified by a green build**, not by assumption.
+### 2. Security audit — `AUDIT.md`
 
-### 2. CSV import bugs — PR #1, against `main`
+Phase 0 of the programme, read-only, all 22 hypotheses adjudicated with `file:line`
+evidence. **Eleven are refuted** and that is the useful half: no `console.*` anywhere,
+foreign keys enforced, transactional migrations, CSPRNG UUIDs, SHA-256 fingerprints, a
+newer backup already refused, nothing leaking in git history or the agent directories.
+Delete those from the programme.
 
-Found by auditing the repo against its own `CLAUDE.md` rules.
+### 3. Nine of ten findings fixed, 0.1.12.2 → 0.1.13.3
 
-- `parseMoneyToCents('1.234')` returned €1.23, not €1234. "Last separator wins"
-  is right for `1.234,56` and wrong for a lone group, which is how Dutch exports
-  write plain thousands. `1.234.567` was worse — it reached `Number()` intact,
-  came back `NaN`, and the row was dropped silently.
-- `parseDate` accepted `31-02-2026` and stored it verbatim.
-- `guessDateFormat` ended `if (first > 12) return 'dmy'; return 'dmy';` — `mdy`
-  unreachable, and only the first row was ever read.
-- The 11 `no-unused-expressions` warnings are gone. Lint is clean.
-
-This was cut from `main`, which predated the `lib/dates.ts` / `db/hash.ts`
-restructure. Reconciled in the merge — see "Read this first".
-
-### 3. Tooling
-
-`gh` CLI 2.97.0 installed at `C:\Program Files\GitHub CLI\gh.exe`, authenticated
-as `Kafloosi` (scopes `gist`, `read:org`, `repo`). Existing shells need a restart
-to get it on `PATH`. Reading Actions logs is what unblocked this session — the
-previous one guessed at the failure because it could not.
+- **F-03** (Critical) — two identical coffees on one day were one coffee. Fingerprints
+  now carry an occurrence ordinal. `nth === 0` produces the pre-ordinal string byte for
+  byte, so **no migration was needed** and re-importing an old statement finally lands
+  the duplicate it wrongly dropped.
+- **F-02** — corrected before it could be fixed, and the correction matters. The
+  programme blamed a float rounding `1.005` to 100 cents; measured, the float mis-parses
+  **none** of 200,000 two-decimal values, and `1.005` is deliberately €1005 because a
+  lone group of three is Dutch thousands. The real defect was `12,34-` — trailing minus,
+  a common Dutch and German export format — parsing as **positive**, filing every
+  expense in the file as income.
+- **F-04** — `restoreBackup` built its `INSERT` from column names in the JSON. A crafted
+  backup was arbitrary SQL. Now an explicit allowlist.
+- **F-05** (partly) — validation runs in full before a row is deleted. Still outstanding:
+  the database file is not copied aside first.
+- **F-06** — `csvCell` neutralises leading `= + - @` so a merchant name cannot become a
+  live formula in the user's spreadsheet.
+- **F-07** — six actions pinned to commit SHAs, `contents: read` by default, publishing
+  isolated in a `release` job that runs no repository code.
+- **F-08** — `secure_delete = ON` and `VACUUM` after a purge.
 
 ## In flight
 
-Nothing half-applied. Everything is merged into `main` and verified.
+Nothing half-applied. Every commit is pushed and every check passes.
 
 ## Next
 
-1. **Cut the first real release.** `git tag v0.1.3.0 && git push --tags` builds
-   the APK and attaches it to a GitHub Release. Nothing has shipped signed yet,
-   so this is the moment the keystore becomes permanent — after this, that one
-   `.p12` is the only way to update an installed Fare without an uninstall, and
-   an uninstall deletes the ledger.
-2. **Delete the merged branches** — `audit-fixes`, `fix-apk-signing`,
-   `worktree-android-release-build`. All three are contained in `main`.
-   `workflow_dispatch` now appears in the Actions tab, since the workflow is on
-   the default branch at last.
-3. **Security tidy-up**, none of it blocking:
-   - Delete the `PKCS12` secret — it holds an unusable value and is shadowed.
-   - Delete `C:\Users\luuks\fare-release.b64`; it is a second copy of the private
-     key in a trivially decodable form.
-   - `fare-release-SECRETS.txt` keeps the password in plaintext beside the `.p12`.
-     Move both into a password manager.
-   - Rotate the store password — `keytool -storepasswd` changes the password, not
-     the key, so signed APKs stay installable.
-   - Enable **Google Play App Signing** when publishing. Play holds the app
-     signing key and you keep a replaceable upload key, so losing the keystore
-     stops being a catastrophe that costs users their ledger.
-4. **Restructure Move 2 (`0.1.2.13`)** — extract `src/components/plate.tsx`. The
-   same selectable control exists nine times: `DirectionPlate` (`app/entry.tsx`),
-   `SpanPlate` (`app/stats.tsx`), `KindPlate` (`app/category.tsx`), `ScopePlate`
-   (`app/budget.tsx`), `Plate` (`app/recurring-rule.tsx`), `Chip`
-   (`app/import.tsx`), `FilterChip` (`app/(tabs)/ledger.tsx`), `Chip`
-   (`components/day-picker.tsx`) and inline plates in settings. The first three
-   are identical apart from their names. Do **not** absorb the `CurrencyPicker`
-   option row — different control.
-5. **Restructure Move 3** — move `toDraft` and `Mapping` out of the 419-line
-   `app/import.tsx` into `lib/csv.ts`.
-6. **Import triage + routing rules** — planned in
-   `C:\Users\luuks\.claude\plans\features-you-recommend-jiggly-matsumoto.md`,
-   sequenced after the restructure so its two new screens use the extracted plate.
-   `import_rules` ships in migration 0 with no repository and no UI, and
-   `app/import.tsx:113` still inserts every row with `category_id: null`.
+**Phase 1, and the order is not negotiable** — reversing it ships a data-loss bug to
+real people:
+
+1. **Encrypted export**, and it has to be genuinely good: `@noble/ciphers` +
+   `@noble/hashes` (both named in the approved plan), AES-256-GCM, Argon2id with the
+   parameters stored in the file, verify-on-write by decrypting what was just produced
+   before claiming success. **Receipts go inside**, base64 within the ciphertext — a
+   decision taken this session, and the cost is real: a small export becomes tens of
+   megabytes with Argon2id over all of it, so it needs progress feedback, not a spinner.
+2. **The backup nag** — "last backed up N days ago" in Settings plus a first-run
+   explanation. Load-bearing, not decoration: after step 3 this export is the only way
+   to move phones.
+3. **SQLCipher**, device-bound key via `SecureStore` with
+   `WHEN_UNLOCKED_THIS_DEVICE_ONLY` and `requireAuthentication`. This is what turns the
+   app lock from a UI gate into a real control. **Expo Go stops working** from here —
+   set up a dev build first, and expect `npm run android` to become `expo run:android`
+   (prebuild tries to make that change already; it was reverted deliberately in
+   0.1.12.0 because it was premature).
+4. **`allowBackup: false`** and the iOS exclusion. Mostly belt-and-braces once 3 is
+   done, since an encrypted database restored onto a new phone is inert.
+
+Then the rest of `AUDIT.md`: F-09 (soft-delete views), and F-05's file copy alongside
+step 1 where it has a second purpose.
 
 ## Traps
 
-- **Do not record a secret as "set and confirmed" without checking.** `gh secret
-  list` takes a second and names them. This cost a session.
-- **PowerShell 5.1 `Get-Content -Raw` reads BOM-less UTF-8 as ANSI.** Writing it
-  back double-encodes every em dash into `â€”`. Use
-  `[System.IO.File]::ReadAllText` / `WriteAllText` with `UTF8Encoding($false)`.
-  `Set-Content -Encoding utf8` adds a BOM, which the linter flags.
-- **Encoding a `.p12` for a secret**: PowerShell 5.1 needs `-Encoding Byte`,
-  PowerShell 7 needs `-AsByteStream`, elsewhere `base64 -w0`. `certutil -encode`
-  wraps the data in PEM lines and is not a substitute.
-- **A fresh clone has no `expo-env.d.ts`**, and `npm run typecheck` fails on
-  `@/global.css` without it. Run `npm start` once, or write
-  `/// <reference types="expo/types" />` into it by hand.
-- **Git Bash mangles `git show branch:path`** — colons and slashes get rewritten.
-  Prefix with `MSYS_NO_PATHCONV=1`.
-- Bumping the version has only ever touched `package.json` and `app.json`, so
-  `package-lock.json` drifted to `0.1.0.0`. PR #1 resyncs it on the `main` line;
-  this branch still carries the stale value. `npm ci` does not care.
+- **`npm run check` before every commit.** `typecheck` does not read SQL strings and
+  `lint` does not run them.
+- **`check:migrations --update` after appending a migration**, once it is final. It
+  refuses an edit to a shipped one, which is the only irreversible rule in the repo.
+- **Never a float in money parsing**, not even briefly. `1.234` is Dutch thousands —
+  `check-money` will fail anyone who "fixes" that.
+- **`nth === 0` in `lib/fingerprint.ts` is load-bearing.** Change that string and every
+  stored import hash stops matching.
+- **`transfer_group_id IS NULL` belongs on every spend or income aggregate.** Use
+  `notATransfer()` so a grep finds them all.
+- **Git hands `.github/workflows/android.yml` back as CRLF**, which defeats anchored
+  regexes. `check-workflow` normalises first.
+- **`.expo/types/router.d.ts` corrupts** if Metro is killed mid-write. Delete it; it is
+  generated and gitignored.
+- **PowerShell 5.1 `Get-Content -Raw`** reads BOM-less UTF-8 as ANSI and double-encodes
+  em dashes. Use `[System.IO.File]::ReadAllText`/`WriteAllText`.
+- **`git show branch:path` in Git Bash** gets mangled. Prefix `MSYS_NO_PATHCONV=1`.
+- **`gh run watch --exit-status` can exit 1 on a network blip** while the run succeeded.
+  Check the run's own conclusion before reporting a failure.
+- The APK is **116 MB** because it is universal, carrying four ABIs. A per-ABI split or
+  an AAB would cut it to roughly a quarter.
 
 ## Open decisions
 
-- App name for the stores. `PRODUCT.md` says undecided; `app.json` says "Fare".
-  The Android package commits to `com.kafloosi.fare` regardless.
-- **EAS vs the current build.** Asked and answered this session: not worth
-  switching for security — EAS means trusting Expo *in addition to* GitHub, and
-  it holds the signing key by default. Switch only for iOS, which this setup can
-  never do from Windows.
-- Multi-currency — the schema carries `currency` per account, nothing decides
-  whether the product supports more than one.
-- Whether accounts are surfaced to the user at all.
-- `PRODUCT.md`'s "Capabilities and Constraints" is stale: it says no screens are
-  built. Every screen has existed since v1.
+- **Vitest, or leave the checks as they are.** `scripts/check-*.mjs` already covers what
+  §4.7 proposed. A runner buys watch mode and a familiar shape; it also adds a dependency
+  to a project whose pitch is that it asks for nothing.
+- **The signing secrets are not behind a GitHub environment** with required reviewers.
+  Settings-UI work, not a commit.
+- **The `release` job's two steps have never run.** It parses and its tag gate is
+  verified, but `download-artifact` placing the file where `action-gh-release` expects it
+  is unproven until the next real tag.
+- **`android.versionCode` is 3.** Bump it on any commit meant to install over v0.1.6.1.
+- Multi-currency: `accounts.currency` is per-row, nothing converts, mixed totals are not
+  attempted.
+- `PRODUCT.md`'s "Capabilities and Constraints" is still stale — it says no screens are
+  built.
