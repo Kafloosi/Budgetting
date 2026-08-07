@@ -1,6 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useState } from 'react';
+import { Image } from 'expo-image';
 import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -31,6 +32,7 @@ import {
 import type { Category, DateOnly } from '@/db/types';
 import { toDateOnly } from '@/lib/dates';
 import { haptics } from '@/lib/haptics';
+import { discardReceipt, pickReceipt, receiptUri, shootReceipt } from '@/lib/receipts';
 import { useTheme } from '@/hooks/use-theme';
 import { useInvalidateLedger, useLedgerQuery } from '@/providers/ledger';
 import { useMoney } from '@/providers/settings';
@@ -62,6 +64,32 @@ export default function EntryScreen() {
   const [saving, setSaving] = useState(false);
   const [prefilled, setPrefilled] = useState<string | null>(null);
   const [accountId, setAccountId] = useState<string | null>(null);
+  const [receipt, setReceipt] = useState<string | null>(null);
+
+  /**
+   * Swaps the photo, deleting the one it replaces. The old file is not worth
+   * keeping — nothing references it once the row points elsewhere.
+   */
+  async function attach(source: () => Promise<string | null>) {
+    const name = await source();
+    if (!name) return;
+    if (receipt) discardReceipt(receipt);
+    setReceipt(name);
+  }
+
+  function removeReceipt() {
+    Alert.alert('Remove this photo?', 'The entry itself stays exactly as it is.', [
+      { text: 'Keep', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: () => {
+          discardReceipt(receipt);
+          setReceipt(null);
+        },
+      },
+    ]);
+  }
 
   const categories = useLedgerQuery((database) => listCategories(database), []);
   const templates = useLedgerQuery((database) => listTemplates(database), []);
@@ -83,6 +111,7 @@ export default function EntryScreen() {
     setDescription(loaded.description);
     setNotes(loaded.notes ?? '');
     setAccountId(loaded.account_id);
+    setReceipt(loaded.receipt_file);
   }
 
   // Only offered when there is a choice to make. One account is the normal case
@@ -116,6 +145,7 @@ export default function EntryScreen() {
           description: description.trim(),
           category_id: categoryId,
           notes: notes.trim() || null,
+          receipt_file: receipt,
           ...(accountId ? { account_id: accountId } : {}),
         });
       } else {
@@ -125,6 +155,7 @@ export default function EntryScreen() {
           description: description.trim(),
           category_id: categoryId,
           notes: notes.trim() || null,
+          receipt_file: receipt,
           // Undefined rather than null: createTransaction resolves the default,
           // and null would be a deliberate "no account", which cannot happen.
           account_id: accountId ?? undefined,
@@ -292,6 +323,44 @@ export default function EntryScreen() {
           </View>
         ) : null}
 
+        <View style={styles.splitAction}>
+          <Text variant="station" tone="muted" style={styles.receiptLabel}>
+            Receipt
+          </Text>
+          <View style={styles.receiptRow}>
+            {receipt ? (
+              <Pressable
+                onPress={removeReceipt}
+                accessibilityRole="button"
+                accessibilityLabel="Remove the receipt photo"
+                style={[styles.receiptThumb, { borderColor: theme.rule }]}>
+                <Image
+                  source={{ uri: receiptUri(receipt) ?? undefined }}
+                  style={styles.receiptImage}
+                  contentFit="cover"
+                  accessibilityLabel="Receipt photo"
+                />
+              </Pressable>
+            ) : null}
+            <View style={styles.receiptButtons}>
+              <Button
+                label={receipt ? 'Replace' : 'Photograph it'}
+                variant="quiet"
+                showArrow={false}
+                onPress={() => attach(shootReceipt)}
+                style={styles.receiptButton}
+              />
+              <Button
+                label="Choose a photo"
+                variant="quiet"
+                showArrow={false}
+                onPress={() => attach(pickReceipt)}
+                style={styles.receiptButton}
+              />
+            </View>
+          </View>
+        </View>
+
         {id && loaded && !loaded.transfer_group_id ? (
           <View style={styles.splitAction}>
             <Button
@@ -424,6 +493,33 @@ const styles = StyleSheet.create({
   },
   splitAction: {
     paddingHorizontal: Space.lg,
+    gap: Space.sm,
+  },
+  receiptLabel: {
+    paddingLeft: Space.xs,
+  },
+  receiptRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.md,
+  },
+  receiptThumb: {
+    width: 56,
+    height: 56,
+    borderRadius: Radius.plate,
+    borderWidth: Stroke.tick,
+    overflow: 'hidden',
+  },
+  receiptImage: {
+    width: '100%',
+    height: '100%',
+  },
+  receiptButtons: {
+    flex: 1,
+    gap: Space.sm,
+  },
+  receiptButton: {
+    minWidth: 0,
   },
   accountRow: {
     gap: Space.sm,

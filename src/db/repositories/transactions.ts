@@ -17,6 +17,7 @@ export interface TransactionInput {
   notes?: string | null;
   source?: TransactionSource;
   import_hash?: string | null;
+  receipt_file?: string | null;
 }
 
 /** A transaction joined with the display fields of its category. */
@@ -160,6 +161,7 @@ export async function updateTransaction(
   if (patch.category_id !== undefined) set('category_id', patch.category_id);
   if (patch.account_id !== undefined) set('account_id', patch.account_id);
   if (patch.notes !== undefined) set('notes', patch.notes);
+  if (patch.receipt_file !== undefined) set('receipt_file', patch.receipt_file);
   if (sets.length === 0) return;
 
   sets.push('updated_at = ?');

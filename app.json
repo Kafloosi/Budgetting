@@ -2,7 +2,7 @@
   "expo": {
     "name": "Fare",
     "slug": "Budgetting",
-    "version": "0.1.10.0",
+    "version": "0.1.11.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "fare",
@@ -46,6 +46,13 @@
         "expo-notifications",
         {
           "color": "#E7002A"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Fare attaches a photo of a receipt to an entry. Photos stay on this phone.",
+          "cameraPermission": "Fare uses the camera to photograph a receipt. Photos stay on this phone."
         }
       ]
     ],

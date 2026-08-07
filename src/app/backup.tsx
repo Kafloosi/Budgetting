@@ -159,6 +159,11 @@ export default function BackupScreen() {
             A full backup is one JSON file holding every row on this phone. Keep it somewhere you
             will still have it if the phone is lost — that file is the only copy.
           </Text>
+          <Text variant="caption" tone="faint" style={styles.copy}>
+            Receipt photos are not in it. They would turn a small readable file into tens of
+            megabytes, and you would find out when a restore failed. Copy them separately if
+            you need them.
+          </Text>
           <Button
             label={busy === 'backup' ? 'Working…' : 'Export a backup'}
             onPress={runBackup}

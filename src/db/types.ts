@@ -95,6 +95,11 @@ export interface Transaction extends SyncableRecord {
    * exclude.
    */
   split_group_id: string | null;
+  /**
+   * File name of a receipt photo inside the app's `receipts` directory. Not a path
+   * — the directory moves between installs, so it is resolved at read time.
+   */
+  receipt_file: string | null;
 }
 
 export type RecurringFrequency = 'weekly' | 'biweekly' | 'monthly';

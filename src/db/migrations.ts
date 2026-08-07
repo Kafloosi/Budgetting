@@ -327,6 +327,20 @@ const MIGRATIONS: string[] = [
   CREATE INDEX idx_transactions_split ON transactions(split_group_id)
     WHERE split_group_id IS NOT NULL AND deleted_at IS NULL;
   `,
+
+  // 11 — a photo of the receipt
+  //
+  // Only the file name is stored, not the image and not an absolute path. The app's
+  // document directory moves between installs and between OS versions, so an
+  // absolute path recorded today is a broken path later; the name is resolved
+  // against the directory at read time.
+  //
+  // The image itself lives outside the database, which is worth writing down: a
+  // future encrypted database does not cover it. Receipts are the one asset that
+  // needs its own answer there.
+  `
+  ALTER TABLE transactions ADD COLUMN receipt_file TEXT;
+  `,
 ];
 
 /** Categories a new install starts with, so the app is usable immediately. */
