@@ -31,6 +31,12 @@ export function formatAbsMoney(cents: number, options?: { locale?: string; curre
  * write `1.234,56` while plenty of exports use `1,234.56`. The separator that
  * appears last is the decimal one; anything else is a thousands separator.
  *
+ * Deliberately never touches a float. `Number(x) * 100` happens to be exact for
+ * every two-decimal value — measured, not assumed — but it is exact by luck of
+ * double precision rather than by construction, it loses integers above
+ * 2^53/100, and it turns a three-decimal input into a plausible wrong number
+ * instead of a refusal. Digits are assembled as a string and cast once.
+ *
  * Returns null when the input is not a number, so callers can show a
  * validation message instead of silently storing a 0.
  */
@@ -38,7 +44,11 @@ export function parseMoneyToCents(input: string): number | null {
   const trimmed = input.trim();
   if (!trimmed) return null;
 
-  const negative = /^-/.test(trimmed) || /^\(.*\)$/.test(trimmed);
+  // Trailing minus is how plenty of Dutch and German exports write a debit
+  // (`12,34-`). Missing it does not round a number — it files every expense in
+  // the file as income.
+  const negative =
+    /^-/.test(trimmed) || /-$/.test(trimmed) || /^\(.*\)$/.test(trimmed);
   const digitsOnly = trimmed.replace(/[^0-9.,]/g, '');
   if (!digitsOnly) return null;
 
@@ -62,11 +72,20 @@ export function parseMoneyToCents(input: string): number | null {
     normalised = digitsOnly.replace(/,/g, '');
   }
 
-  const value = Number(normalised);
-  if (!Number.isFinite(value)) return null;
+  // `normalised` is now plain digits with at most one dot as the decimal point.
+  if (!/^\d*(\.\d*)?$/.test(normalised) || !/\d/.test(normalised)) return null;
 
-  // Rounding before the int cast avoids 19.99 * 100 landing on 1998.
-  const cents = Math.round(value * 100);
+  const [whole, fraction = ''] = normalised.split('.');
+
+  // Three or more decimals that were not a thousands group mean the column
+  // mapping is pointing at something that is not money — a rate, a quantity, a
+  // balance in a foreign currency. No bank writes three decimals for a euro
+  // amount, so saying so beats storing a confident fifth of the real figure.
+  if (fraction.length > 2) return null;
+
+  const cents = Number(`${whole || '0'}${fraction.padEnd(2, '0')}`);
+  if (!Number.isSafeInteger(cents)) return null;
+
   return negative ? -cents : cents;
 }
 

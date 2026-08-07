@@ -27,6 +27,7 @@ import {
   type TransactionInput,
 } from '@/db/repositories/transactions';
 import { importHash } from '@/db/hash';
+import { assignOrdinals } from '@/lib/fingerprint';
 import {
   DATE_FORMAT_LABELS,
   guessColumns,
@@ -165,15 +166,24 @@ export default function ImportScreen() {
       // Loaded once for the whole statement rather than queried per row.
       const matchCategory = await loadRuleMatcher(db);
 
+      // Two identical coffees on one day are two transactions. Numbering each row
+      // by how many identical ones preceded it in this file is what tells them
+      // apart, while a re-import of the same file reproduces the same numbers and
+      // so still collides with itself.
       const inputs: TransactionInput[] = [];
-      for (const draft of drafts) {
+      for (const draft of assignOrdinals(drafts)) {
         inputs.push({
           amount_cents: draft.amount_cents,
           date: draft.date,
           description: draft.description,
           category_id: matchCategory(draft.description),
           source: 'import',
-          import_hash: await importHash(draft.date, draft.amount_cents, draft.description),
+          import_hash: await importHash(
+            draft.date,
+            draft.amount_cents,
+            draft.description,
+            draft.nth,
+          ),
         });
       }
 

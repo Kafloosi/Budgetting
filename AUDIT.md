@@ -19,11 +19,13 @@ access and, plausibly, already copied to the user's Google Drive. The biometric 
 lock is a UI gate in front of that file: real against someone holding an unlocked
 phone, worth nothing against anyone who can read storage.
 
-Underneath, two data-correctness bugs are confirmed and both are the silent kind.
-Money parsing routes every imported amount through a float, so `1.005` becomes 100
-cents rather than 101. Import dedupe fingerprints on date + amount + description with
-no occurrence counter, so **two identical coffees on the same day are one coffee** —
-the second is silently discarded and the month's spending reads low.
+Underneath, two data-correctness bugs were confirmed and both were the silent kind.
+**Both are fixed as of 0.1.12.2** — see F-02 and F-03, and note that F-02's write-up is
+corrected there: the float the programme blamed mis-parses no two-decimal amount at
+all, and the real defect was a trailing-minus sign inversion that recorded every
+expense in a Dutch or German export as income. Import dedupe fingerprinted on
+date + amount + description with no occurrence counter, so **two identical coffees on
+the same day were one coffee** — the second silently discarded, the month reading low.
 
 One finding the programme did not anticipate: the backup restore path builds an
 `INSERT` from column names taken out of the JSON file, which makes a hand-edited
@@ -74,23 +76,37 @@ the main file.
 **Test that would catch a regression:** a check that `PRAGMA cipher_version` returns
 non-empty on a freshly opened database, run in CI.
 
-### F-02 · Critical · Every imported amount passes through a float
+### F-02 · High · Amount parsing loses the sign on trailing-minus exports — FIXED in 0.1.12.2
 
-**Where:** `src/lib/money.ts:65-69` — `Number(normalised)` then `Math.round(value * 100)`.
-**What happens:** binary floating point makes `Math.round(1.005 * 100)` produce 100, not
-101, and `Math.round(8.165 * 100)` produce 816, not 817. Across a statement this
-produces totals that cannot be reconciled against the bank by a few cents. The comment
-on line 68 shows the author knew rounding was delicate and reached for `Math.round`,
-which fixes `19.99` and not `1.005`.
-**Who it affects:** every user who imports a statement. Silent.
-**Proposed fix:** parse as a string — split on the decimal separator, pad or truncate
-the fraction to exactly two digits, concatenate, `parseInt`. Reject more than two
-fractional digits rather than guessing, since a bank does not emit them and their
-presence means the column mapping is wrong.
-**Test that would catch a regression:** the table in the programme's B-03, including
-`1.005 → 101` and `8.165 → 817`.
+**Corrected after measuring.** This was first written up as the programme's B-03 — a
+float rounding `1.005` to 100 cents instead of 101 — and that was wrong twice over.
+`Math.round(Number(x) * 100)` was measured against all 200,000 two-decimal values from
+0 to 1999.99 and mis-parses **none** of them. And `1.005` was never one euro and a
+half-cent here: `isLoneThousandsGroup` deliberately reads a lone group of three as
+Dutch thousands, so `1.005` is €1005 and correctly returned 100500. The programme
+assumed a convention this app does not use.
 
-### F-03 · Critical · Two identical transactions on one day become one
+What the audit found once the assumption was dropped:
+
+**Where:** `src/lib/money.ts:41` — `negative` tested `/^-/` and `/^\(.*\)$/` only.
+**What happens:** `12,34-` — trailing minus, which is how many Dutch and German exports
+write a debit — parsed as **positive**. Every expense in such a file was recorded as
+income. Not a rounding error: a sign inversion that inflates income and hides spending
+for the whole statement.
+**Second defect:** three or more fractional digits that were not a thousands group were
+rounded to two through the float, so a column mapping pointed at a rate or a quantity
+produced a plausible small number (`1.2345` → 123 cents) instead of a refusal.
+**Who it affects:** anyone importing from a bank that uses trailing minus, and anyone
+who maps the wrong column.
+**Fix shipped:** trailing minus recognised; the parse assembles digits as a string and
+casts once, so no float is involved at any point; more than two decimals returns null,
+which the import screen already surfaces as "does not read as a day and an amount"; a
+`Number.isSafeInteger` guard replaces the silent integer loss above 2^53/100.
+**Regression test:** `money-check.mjs` — trailing minus in three formats, over-precise
+input refused, the thousands convention pinned as deliberate, 22 non-regression cases,
+and all 200,000 two-decimal values round-tripping exactly.
+
+### F-03 · Critical · Two identical transactions on one day become one — FIXED in 0.1.12.2
 
 **Where:** `src/db/hash.ts:32-41`, and the partial unique index at `migrations.ts:87`.
 **What happens:** the fingerprint is `date | amount_cents | normalisedDescription`. Two
@@ -105,8 +121,18 @@ because unlike F-01 it is already producing wrong numbers.
 *within the file being imported*. Re-importing regenerates the same ordinals, so both
 rows still collide and both are still skipped. Also disclose the skip count, which the
 import screen already has the data for.
-**Test that would catch a regression:** the two tests in the programme's B-01, which
-must both pass — they are in direct tension and that tension is the design.
+**Fix shipped:** `lib/fingerprint.ts` holds the rule, with no native dependency so it
+can be tested; `db/hash.ts` only digests it. `assignOrdinals` numbers each row by how
+many identical ones preceded it in the same file, and `nth === 0` produces the
+pre-ordinal string byte for byte.
+
+That last detail answers open question 2 and removes the need for a migration: rows
+already fingerprinted on a phone keep matching, so re-importing an old statement still
+skips what is there — and the duplicate that was wrongly dropped last time finally
+lands. The fix repairs history rather than only improving future imports.
+**Regression test:** `dedupe-check.mjs` — both tensioned properties from the
+programme's B-01 pass together, plus an overlapping statement adding only what is new,
+and the `nth=0` hash asserted equal to `sha256('2026-03-04|-350|coffee shop')`.
 
 ### F-04 · High · A backup file can inject SQL into the restore
 
@@ -226,9 +252,9 @@ database key, or state plainly that they are not protected.
 
 1. **Receipts** (F-10): encrypt them alongside the database, or state that they are not
    protected? Encrypting means decrypting to display, which is work.
-2. **F-03's fix changes stored hashes.** Existing rows keep their current fingerprints;
-   only new imports use the ordinal. That means one statement re-imported across the
-   change could duplicate. Accept that once, or migrate old hashes?
+2. ~~**F-03's fix changes stored hashes.**~~ **Answered by the fix.** Making `nth === 0`
+   produce the pre-ordinal string byte for byte means no stored fingerprint changes and
+   no migration is needed. Nothing to decide.
 3. **`secure_delete`** (F-08) costs write throughput on every delete. Acceptable for a
    ledger this size, but it is your call.
 4. **The programme's §4.7 proposes Vitest.** `CLAUDE.md` currently states no tests
