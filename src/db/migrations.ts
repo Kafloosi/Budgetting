@@ -399,6 +399,11 @@ export async function migrateDatabase(db: SQLiteDatabase): Promise<void> {
   // writing hundreds of rows while the list screen is still on screen.
   await db.execAsync('PRAGMA journal_mode = WAL;');
   await db.execAsync('PRAGMA foreign_keys = ON;');
+  // Overwrites freed pages instead of leaving them to be reused. Without it a row
+  // deleted, held thirty days and then purged still sits in the file, recoverable
+  // from a hex dump — so something deliberately deleted a year ago is still there.
+  // Costs write throughput, which a ledger of this size does not notice.
+  await db.execAsync('PRAGMA secure_delete = ON;');
 
   const row = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
   const currentVersion = row?.user_version ?? 0;

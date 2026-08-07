@@ -62,7 +62,23 @@ export async function purgeTransaction(db: SQLiteDatabase, id: string): Promise<
 /** Empties the trash. */
 export async function purgeAll(db: SQLiteDatabase): Promise<number> {
   const result = await db.runAsync('DELETE FROM transactions WHERE deleted_at IS NOT NULL');
+  await reclaim(db, result.changes);
   return result.changes;
+}
+
+/**
+ * Returns the freed pages to the filesystem.
+ *
+ * `secure_delete` overwrites a deleted row's bytes, but the page stays in the file
+ * and the file never shrinks on its own — so the size of someone's database still
+ * hints at how much they once had in it. VACUUM rewrites it.
+ *
+ * Cannot run inside a transaction, and rewrites the whole file, so it is only worth
+ * it when something was actually purged.
+ */
+async function reclaim(db: SQLiteDatabase, purged: number): Promise<void> {
+  if (purged === 0) return;
+  await db.execAsync('VACUUM;');
 }
 
 /**
@@ -76,5 +92,6 @@ export async function purgeExpired(db: SQLiteDatabase): Promise<number> {
     'DELETE FROM transactions WHERE deleted_at IS NOT NULL AND deleted_at < ?',
     [cutoff],
   );
+  await reclaim(db, result.changes);
   return result.changes;
 }

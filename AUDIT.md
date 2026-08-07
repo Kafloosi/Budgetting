@@ -207,13 +207,17 @@ create an environment, attach the secrets to it, then the workflow gains
 **Regression test:** `scripts/check-workflow.mjs`, which fails on any unpinned `uses:`,
 a non-read-only top-level `permissions`, or a secret interpolated into a `run:` block.
 
-### F-08 · Medium · Purged transactions remain in the file
+### F-08 · Medium · Purged transactions remain in the file — FIXED in 0.1.13.3
 
 **Where:** no `secure_delete`, no `VACUUM` after `purgeExpired` (`trash.ts:73`).
 **What happens:** a row deleted, held 30 days and purged still sits in a free page. The
 file never shrinks. Something deliberately deleted a year ago is recoverable from a hex
 dump.
-**Proposed fix:** `PRAGMA secure_delete = ON` on open, and `VACUUM` after a purge.
+**Fixed:** `PRAGMA secure_delete = ON` set in `migrateDatabase` beside `foreign_keys`,
+so it applies to the one connection the app opens. `VACUUM` runs after `purgeExpired`
+and `purgeAll`, and only when something was actually purged — it rewrites the whole
+file, so it is not worth doing for nothing. Without the VACUUM the pages are wiped but
+the file never shrinks, and its size still hints at how much was once in it.
 
 ### F-09 · Medium · Soft-delete filtering is correct but unenforced
 
@@ -268,15 +272,39 @@ database key, or state plainly that they are not protected.
 - **B-10's double-posting** — `catchUpRecurring` is guarded by `last_applied_date` and
   bounded by `MAX_CATCH_UP`. Worth a test, not a fix.
 
-## Open questions for the owner
+## Decisions taken
 
-1. **Receipts** (F-10): encrypt them alongside the database, or state that they are not
-   protected? Encrypting means decrypting to display, which is work.
-2. ~~**F-03's fix changes stored hashes.**~~ **Answered by the fix.** Making `nth === 0`
-   produce the pre-ordinal string byte for byte means no stored fingerprint changes and
-   no migration is needed. Nothing to decide.
-3. **`secure_delete`** (F-08) costs write throughput on every delete. Acceptable for a
-   ledger this size, but it is your call.
-4. **The programme's §4.7 proposes Vitest.** `CLAUDE.md` currently states no tests
-   exist and that `typecheck` + `lint` are the only checks. Adding a runner changes that
-   contract — confirm before I rewrite it.
+All four are settled. Recorded here because they shape work that has not been written
+yet, and the reasoning will not be obvious from the diff.
+
+1. **Receipts go inside the encrypted backup**, as base64 within the ciphertext. Chosen
+   over leaving them out, so a restore is complete and nothing about the ledger is left
+   in the clear. The cost is accepted and real: a 200 KB export becomes tens of
+   megabytes and Argon2id then runs over all of it, so the export needs progress
+   feedback rather than a spinner. This is also the answer to F-10 — the photos stop
+   being an unprotected asset class once they only leave the device encrypted.
+2. **SQLCipher proceeds**, with the device-bound key, and the app nags about backups:
+   a "last backed up N days ago" line in Settings and a first-run explanation. The nag
+   is not decoration — once the key is device-bound, the encrypted export is the only
+   way to move phones, and a lost phone with no recent export is a lost ledger.
+3. **`secure_delete` is on**, with `VACUUM` after a purge. Done in 0.1.13.3.
+4. ~~**F-03's fix changes stored hashes.**~~ Answered by the fix: `nth === 0` produces
+   the pre-ordinal string byte for byte, so no stored fingerprint changes and no
+   migration is needed.
+
+## Still open
+
+1. **Vitest, or leave the checks as they are.** The programme's §4.7 proposes Vitest.
+   `scripts/check-*.mjs` now covers what it was proposed for — money, dedupe, schema,
+   ledger arithmetic, backup validation, the workflow — with 116 assertions, no
+   dependency and no config, run by `npm run check`. A real runner would buy watch mode,
+   parallelism, and a familiar shape for anyone else who works on this. It would also
+   add a dependency to a project whose pitch is that it asks for nothing. Not urgent
+   either way; worth deciding before the suite gets much bigger.
+2. **The signing secrets are not behind a GitHub environment** with required reviewers.
+   That is a settings change in the GitHub UI rather than a file here, so it needs you —
+   see F-07.
+3. **The release job's two steps are unexercised.** It parses and its tag gate works
+   (verified: `job release: skipped` on a `workflow_dispatch` run), but
+   `download-artifact` placing the file where `action-gh-release` expects it will only
+   be proven on the next real tag.
