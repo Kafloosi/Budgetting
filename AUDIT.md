@@ -179,7 +179,7 @@ apostrophe, then applies RFC 4180 quoting. Ordinary text is untouched.
 **Regression test:** `scripts/check-backup.mjs`, seven formula payloads plus six
 non-mangling cases.
 
-### F-07 · High · Signing secrets are exposed to five mutable third-party actions
+### F-07 · High · Signing secrets are exposed to five mutable third-party actions — FIXED in 0.1.13.1
 
 **Where:** `.github/workflows/android.yml:28,30,38,155,163`, and `permissions:
 contents: write` at line 20.
@@ -187,11 +187,25 @@ contents: write` at line 20.
 compromised release of any of them runs inside a job holding all four signing secrets
 and a `contents: write` token. The keystore is the one asset whose loss ends the app's
 upgrade path for every user.
-**Proposed fix:** pin all five to full commit SHAs; drop the top-level block to
-`contents: read` and grant `write` only to the release step's job; put the signing
-secrets behind a GitHub environment with required approval.
-**Test that would catch a regression:** a CI check rejecting any `uses:` without a
-40-character SHA.
+**Fixed:** all six actions pinned to 40-character commit SHAs, each with the version
+as a trailing comment and the `gh api` command to move one on purpose recorded above
+them. Top-level `permissions` is now `contents: read`, and publishing moved into its
+own `release` job which holds the only `contents: write` and runs no repository code —
+it downloads the artifact the build produced. `persist-credentials: false` on checkout,
+so the token is not left in `.git/config` for later steps to read.
+
+**What this does and does not buy.** It does not narrow what the *signing secrets* are
+exposed to: they have to be in the job that runs Gradle. What it narrows is what a
+compromised action could do to the repository, and it removes the mutable-tag
+substitution entirely.
+
+**Still outstanding, and it needs you:** putting the four signing secrets behind a
+GitHub **environment with required reviewers**, so a workflow change alone cannot
+exfiltrate them. That is a settings change in the GitHub UI, not a file in this repo —
+create an environment, attach the secrets to it, then the workflow gains
+`environment: release-signing` on the build job.
+**Regression test:** `scripts/check-workflow.mjs`, which fails on any unpinned `uses:`,
+a non-read-only top-level `permissions`, or a secret interpolated into a `run:` block.
 
 ### F-08 · Medium · Purged transactions remain in the file
 

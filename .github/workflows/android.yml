@@ -17,17 +17,30 @@ on:
     tags:
       - 'v*'
 
+# Read-only by default. Only the job that publishes a release gets write, and it is
+# a job that runs no project code — see the two jobs below.
 permissions:
-  contents: write
+  contents: read
 
+# Third-party actions are pinned to a commit SHA rather than a tag. A tag is a
+# pointer its publisher can move, and this workflow holds four signing secrets: a
+# compromised release of any action in it is the worst day this project can have.
+# The trailing comment is the human-readable version; the SHA is what runs.
+#
+# To move one on purpose:
+#   gh api repos/<owner>/<repo>/commits/<tag> --jq .sha
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # Nothing here pushes, and leaving the token in .git/config makes it
+          # readable by every later step, including project build scripts.
+          persist-credentials: false
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 22
           cache: npm
@@ -35,7 +48,7 @@ jobs:
       # React Native 0.86 builds on JDK 17. The action major is a separate thing
       # from the JDK it installs — v5 runs on Node 24, which is what the runner
       # now requires; `java-version` still pins the toolchain to 17.
-      - uses: actions/setup-java@v5
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
         with:
           distribution: temurin
           java-version: 17
@@ -152,17 +165,35 @@ jobs:
           ls -lh "$APK"
           unzip -l "$APK" | grep -q 'assets/index.android.bundle'
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: app-release-apk
           path: android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
 
-      - name: Publish the release
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
+  # Publishing is its own job so the job that runs project code — npm ci, a config
+  # plugin, prebuild, Gradle, all of it third-party and all of it able to run
+  # arbitrary scripts — holds a read-only token. This job runs no repository code at
+  # all: it downloads the artifact the build already produced and attaches it.
+  #
+  # It does not narrow what the signing secrets are exposed to; they have to be in
+  # the build. What it narrows is what could be done with the repository itself.
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          files: android/app/build/outputs/apk/release/app-release.apk
+          name: app-release-apk
+
+      - name: Publish the release
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+        with:
+          files: app-release.apk
           body: |
             Fare ${{ github.ref_name }} — Android.
 
