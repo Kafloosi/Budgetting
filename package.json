@@ -1,7 +1,7 @@
 {
   "name": "budgetting",
   "main": "expo-router/entry",
-  "version": "0.1.12.3",
+  "version": "0.1.13.0",
   "dependencies": {
     "@expo/ui": "~57.0.9",
     "expo": "~57.0.10",
@@ -55,7 +55,8 @@
     "check:migrations": "node ./scripts/check-migrations.mjs",
     "check:money": "node ./scripts/check-money.mjs",
     "check:fingerprint": "node ./scripts/check-fingerprint.mjs",
-    "check:ledger": "node ./scripts/check-ledger.mjs"
+    "check:ledger": "node ./scripts/check-ledger.mjs",
+    "check:backup": "node ./scripts/check-backup.mjs"
   },
   "private": true
 }

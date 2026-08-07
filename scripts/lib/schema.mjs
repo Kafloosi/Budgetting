@@ -56,8 +56,20 @@ export function openMigratedDb({ upTo } = {}) {
   return db;
 }
 
-/** Imports a TypeScript module from `src/`, relying on Node's type stripping. */
+let aliasRegistered = false;
+
+/**
+ * Imports a TypeScript module from `src/`, relying on Node's type stripping.
+ *
+ * The `@/` alias hook is registered on first use rather than at load, so a check that
+ * only needs the schema does not pay for it.
+ */
 export async function importSource(relative) {
+  if (!aliasRegistered) {
+    const { register } = await import('node:module');
+    register('./alias-hook.mjs', import.meta.url);
+    aliasRegistered = true;
+  }
   const { pathToFileURL } = await import('node:url');
   return import(pathToFileURL(join(ROOT, relative)).href);
 }

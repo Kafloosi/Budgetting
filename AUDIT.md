@@ -134,7 +134,7 @@ lands. The fix repairs history rather than only improving future imports.
 programme's B-01 pass together, plus an overlapping statement adding only what is new,
 and the `nth=0` hash asserted equal to `sha256('2026-03-04|-350|coffee shop')`.
 
-### F-04 · High · A backup file can inject SQL into the restore
+### F-04 · High · A backup file can inject SQL into the restore — FIXED in 0.1.13.0
 
 **Where:** `src/lib/backup.ts:82-84` — `Object.keys(rows[0])` becomes
 `INSERT INTO ${table} (${columns.join(', ')})`.
@@ -149,7 +149,7 @@ drop anything else, before building the statement. Combine with F-05.
 **Test that would catch a regression:** a fixture backup carrying a malicious column
 name; assert the restore refuses and the database is unchanged.
 
-### F-05 · High · Restore trusts the file's shape and cannot be undone
+### F-05 · High · Restore trusts the file's shape and cannot be undone — PARTLY FIXED in 0.1.13.0
 
 **Where:** `src/lib/backup.ts:61-98`.
 **What happens:** only `app` and `format` are checked. Types are not: `amount_cents`
@@ -157,21 +157,27 @@ arriving as `"12.50"` is inserted as a string into an INTEGER column, which SQLi
 accepts. The restore runs in one transaction, so it is atomic — but it begins by
 `DELETE FROM` every table, so a file that is valid JSON and wrong in content destroys
 the existing ledger with nothing to roll back to.
-**Proposed fix:** validate types and required fields before touching the database, and
-copy the database file aside first so a wholesale rollback is possible.
-**Test that would catch a regression:** the fixture set in the programme's B-09; each
-must fail cleanly and leave the database byte-identical.
+**Fixed:** `validateBackup` in `lib/backup-format.ts` runs in full before a row is
+deleted and refuses a wrong `app`, a future `format`, a non-list table, a non-record
+row, an unknown field, a non-scalar value, a missing or duplicated id, and any cents
+column that is not a whole number.
+**Still outstanding:** the database file is not copied aside first, so a restore that
+fails *after* validation — a disk error mid-write — still has nothing to roll back to.
+The transaction covers SQLite-level failure; it does not cover the file. Do this with
+the encrypted-export work in §4.3, where the copy has a second purpose.
+**Regression test:** `scripts/check-backup.mjs`, 14 malformed fixtures.
 
-### F-06 · High · CSV export lets a merchant name become a formula
+### F-06 · High · CSV export lets a merchant name become a formula — FIXED in 0.1.13.0
 
 **Where:** `src/lib/backup.ts:145-148`. `quote()` implements RFC 4180 correctly and
 stops there.
 **What happens:** a description beginning `=`, `+`, `-` or `@` is a live formula when the
 export is opened in Excel, LibreOffice or Sheets. Descriptions come from bank CSVs, so
 the content is whatever a merchant put in a payment reference.
-**Proposed fix:** prefix a leading `= + - @`, tab or CR with a single quote on export;
-strip one leading `'` on import so a round-trip is lossless.
-**Test that would catch a regression:** the `it.each` in the programme's B-08.
+**Fixed:** `csvCell` prefixes a leading `=`, `+`, `-`, `@`, tab or CR with an
+apostrophe, then applies RFC 4180 quoting. Ordinary text is untouched.
+**Regression test:** `scripts/check-backup.mjs`, seven formula payloads plus six
+non-mangling cases.
 
 ### F-07 · High · Signing secrets are exposed to five mutable third-party actions
 

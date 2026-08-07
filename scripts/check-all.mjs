@@ -13,7 +13,13 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
-const CHECKS = ['check-migrations.mjs', 'check-money.mjs', 'check-fingerprint.mjs', 'check-ledger.mjs'];
+const CHECKS = [
+  'check-migrations.mjs',
+  'check-money.mjs',
+  'check-fingerprint.mjs',
+  'check-ledger.mjs',
+  'check-backup.mjs',
+];
 
 let failed = 0;
 

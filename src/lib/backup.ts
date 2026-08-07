@@ -1,6 +1,16 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 import { nowIso, withTransaction } from '@/db/util';
+import {
+  BACKUP_COLUMNS,
+  csvCell,
+  FORMAT_VERSION,
+  TABLES,
+  validateBackup,
+  type Backup,
+  type Row,
+  type TableName,
+} from '@/lib/backup-format';
 
 /**
  * Whole-ledger backup and restore.
@@ -8,35 +18,14 @@ import { nowIso, withTransaction } from '@/db/util';
  * Local-first means the user owns the only copy, so moving to a new phone has
  * to be possible without an account. The file is plain JSON of every row — a
  * format the user can read, and one that survives this app being uninstalled.
+ *
+ * The format itself, the columns a restore may write, the validation and the CSV
+ * escaping live in `lib/backup-format.ts`, which touches no database and can
+ * therefore be checked directly. This file is the part that talks to SQLite.
  */
 
-/** Bump when the shape changes in a way an older reader cannot handle. */
-const FORMAT_VERSION = 1;
-
-/** Tables carried in a backup, in dependency order so a restore can replay them. */
-const TABLES = [
-  'categories',
-  'accounts',
-  'transactions',
-  'budgets',
-  'import_rules',
-  'import_presets',
-  'saved_filters',
-  'recurring_rules',
-  'goals',
-  'templates',
-  'settings',
-] as const;
-
-type TableName = (typeof TABLES)[number];
-type Row = Record<string, string | number | null>;
-
-export interface Backup {
-  format: number;
-  app: 'fare';
-  exported_at: string;
-  tables: Record<TableName, Row[]>;
-}
+export { validateBackup, csvCell, BACKUP_COLUMNS } from '@/lib/backup-format';
+export type { Backup } from '@/lib/backup-format';
 
 export async function exportBackup(db: SQLiteDatabase): Promise<Backup> {
   const tables = {} as Record<TableName, Row[]>;
@@ -61,12 +50,10 @@ export interface RestoreResult {
  * silently interleaving them would produce a ledger nobody could trust.
  */
 export async function restoreBackup(db: SQLiteDatabase, backup: Backup): Promise<RestoreResult> {
-  if (backup?.app !== 'fare' || typeof backup.format !== 'number') {
-    throw new Error('That file is not a Fare backup.');
-  }
-  if (backup.format > FORMAT_VERSION) {
-    throw new Error('That backup was made by a newer version of Fare. Update the app first.');
-  }
+  // Validated in full before a single row is deleted. Everything below this line is
+  // destructive and has nothing to roll back to.
+  const validation = validateBackup(backup);
+  if (!validation.ok) throw new Error(validation.problem);
 
   const counts: Partial<Record<TableName, number>> = {};
   let total = 0;
@@ -81,7 +68,14 @@ export async function restoreBackup(db: SQLiteDatabase, backup: Backup): Promise
       const rows = backup.tables?.[table] ?? [];
       if (rows.length === 0) continue;
 
-      const columns = Object.keys(rows[0]);
+      // Intersected with the allowlist rather than taken from the file, so a column
+      // name can never reach the statement. Validation has already refused anything
+      // unknown; this is the belt to that braces.
+      const columns = BACKUP_COLUMNS[table].filter((column) =>
+        rows.some((row) => row[column] !== undefined),
+      );
+      if (columns.length === 0) continue;
+
       const placeholders = columns.map(() => '?').join(', ');
       const statement = `INSERT INTO ${table} (${columns.join(', ')}) VALUES (${placeholders})`;
 
@@ -129,20 +123,14 @@ export async function exportCsv(db: SQLiteDatabase): Promise<string> {
     lines.push(
       [
         row.date,
-        quote(row.description),
-        quote(row.category ?? ''),
+        csvCell(row.description),
+        csvCell(row.category ?? ''),
         (row.amount_cents / 100).toFixed(2),
-        quote(row.notes ?? ''),
+        csvCell(row.notes ?? ''),
         row.source,
       ].join(','),
     );
   }
 
   return lines.join('\n');
-}
-
-/** RFC 4180 quoting: wrap when it could confuse a reader, double inner quotes. */
-function quote(value: string): string {
-  if (!/[",\n\r]/.test(value)) return value;
-  return `"${value.replace(/"/g, '""')}"`;
 }
