@@ -234,14 +234,6 @@ export function RouteLine({
   );
 }
 
-/**
- * A short length of route used as a rule between sections — the diagram's
- * answer to a horizontal divider.
- */
-export function RouteRule({ color, width = 32 }: { color: string; width?: number }) {
-  return <View style={[styles.rule, { width, backgroundColor: color }]} />;
-}
-
 const styles = StyleSheet.create({
   track: {
     justifyContent: 'center',
@@ -262,10 +254,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   markerCore: {
-    borderRadius: Radius.full,
-  },
-  rule: {
-    height: Stroke.tick * 2,
     borderRadius: Radius.full,
   },
 });

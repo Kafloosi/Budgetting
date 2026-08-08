@@ -125,21 +125,6 @@ export function IconBack({ size, color }: IconProps) {
   );
 }
 
-export function IconChevronDown({ size, color }: IconProps) {
-  return (
-    <Frame size={size}>
-      <Path
-        d="M6 9 L12 15 L18 9"
-        stroke={color}
-        strokeWidth={STROKE}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        fill="none"
-      />
-    </Frame>
-  );
-}
-
 export function IconSearch({ size, color }: IconProps) {
   return (
     <Frame size={size}>
