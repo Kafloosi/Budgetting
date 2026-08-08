@@ -83,6 +83,29 @@ export default function SettingsScreen() {
     update({ budgetAlerts: true });
   }
 
+  /**
+   * Asks the OS only when switching on, and refuses to leave the toggle looking
+   * on when permission was not given — a switch that lies is worse than a switch
+   * that is disabled.
+   */
+  async function toggleImportNudge(next: boolean) {
+    if (!next) {
+      update({ importNudge: false });
+      return;
+    }
+    const allowed = await askToNotify();
+    if (!allowed) {
+      setAlertsBlocked(true);
+      Alert.alert(
+        'Fare cannot send notifications',
+        'Allow notifications for Fare in your phone’s settings, then turn this back on.',
+      );
+      return;
+    }
+    setAlertsBlocked(false);
+    update({ importNudge: true });
+  }
+
   useEffect(() => {
     let cancelled = false;
     canUseAppLock().then((available) => {
@@ -220,6 +243,24 @@ export default function SettingsScreen() {
               trackColor={{ true: Line.green, false: theme.rule }}
               thumbColor={theme.ink}
               accessibilityLabel="Budget alerts"
+            />
+          </View>
+          <View style={styles.toggleRow}>
+            <View style={styles.rowBody}>
+              <Text variant="body">Import reminder</Text>
+              <Text variant="caption" tone="muted">
+                {alertsBlocked
+                  ? 'Turned off for Fare in your phone’s settings. Allow notifications there first.'
+                  : 'Tell me when nothing has been imported for a while, so a month of spending does not go missing. Checked when Fare opens.'}
+              </Text>
+            </View>
+            <Switch
+              value={settings.importNudge}
+              onValueChange={toggleImportNudge}
+              disabled={alertsBlocked}
+              trackColor={{ true: Line.green, false: theme.rule }}
+              thumbColor={theme.ink}
+              accessibilityLabel="Import reminder"
             />
           </View>
         </View>
