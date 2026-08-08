@@ -270,8 +270,10 @@ export async function runImport(
  * Takes an import back.
  *
  * Soft, like every other delete here, so the rows land in trash rather than
- * vanishing — and so their import_hash keeps colliding, which is what stops an
- * undone import from silently re-landing on the next attempt.
+ * vanishing. That is the only protection: the unique index on import_hash is
+ * scoped to `deleted_at IS NULL` (see migrations.ts), so a soft-deleted row
+ * does not collide with anything — a later import of the same statement
+ * re-lands cleanly rather than being blocked.
  */
 export async function undoImport(db: SQLiteDatabase, ids: string[]): Promise<void> {
   if (ids.length === 0) return;

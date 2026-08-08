@@ -23,6 +23,11 @@
  * had already started, so a remount retries and — since the file really is
  * gone by then — reports it instead of doing nothing. See the comments on
  * `writeStarted` and `settled` in the effect.
+ *
+ * That guarantee stops at the write itself: a re-lock that lands *after*
+ * `writeStarted` becomes true still lets `runImport` finish and the ledger
+ * update, but `offer` is skipped once `cancelled` is true, so the rows land
+ * with no undo bar shown. Known and accepted, not fixed.
  */
 
 import { useLinkingURL } from 'expo-linking';
@@ -84,8 +89,14 @@ export function IncomingFileProvider({ children }: { children: ReactNode }) {
     // header.
     if (settingsLoading) return;
     if (!url || handledUrl === url) return;
-    // fare:// links are routes, and expo-router already owns them.
-    if (url.startsWith('fare://')) return;
+    // Allowlist, not a denylist: only a file:// or content:// URL is something
+    // another app handed us to import. `useLinkingURL()` returns whatever URL
+    // launched the process — in Expo Go that is exp://192.168.x.x:8081, and a
+    // future universal link would be https://. An unknown scheme is not a
+    // file, and guessing would mean showing "That file is no longer there" on
+    // a launch the user did nothing to cause. fare:// links are routes, and
+    // expo-router already owns them, so they fall out of this the same way.
+    if (!url.startsWith('file://') && !url.startsWith('content://')) return;
     handledUrl = url;
 
     let cancelled = false;
@@ -140,11 +151,19 @@ export function IncomingFileProvider({ children }: { children: ReactNode }) {
         if (cancelled) return;
 
         if (outcome.inserted === 0) {
-          offer(`${preset.name}: nothing new`, () => {});
+          const message =
+            outcome.invalid > 0
+              ? `${preset.name}: ${outcome.invalid} row${outcome.invalid === 1 ? '' : 's'} could not be read, nothing else was new`
+              : `${preset.name}: nothing new`;
+          offer(message, () => {});
           return;
         }
 
-        offer(`${outcome.inserted} added from ${preset.name}`, async () => {
+        const message =
+          outcome.invalid > 0
+            ? `${outcome.inserted} added from ${preset.name}, ${outcome.invalid} row${outcome.invalid === 1 ? '' : 's'} could not be read`
+            : `${outcome.inserted} added from ${preset.name}`;
+        offer(message, async () => {
           await undoImport(db, outcome.ids);
           invalidate();
         });
@@ -172,6 +191,12 @@ export function IncomingFileProvider({ children }: { children: ReactNode }) {
       // retry) or started a write (must not be retried), so the claim stays.
       if (!settled && !writeStarted && handledUrl === url) handledUrl = null;
     };
+    // Every dependency here must be identity-stable across renders, or the
+    // cleanup above can fire mid-flight for reasons unrelated to a real
+    // unmount, releasing `handledUrl` while the async work is still running.
+    // `router` is expo-router's module singleton; `offer` and `invalidate`
+    // are both useCallback([]). If either stops being memoised, this silently
+    // reintroduces the race the fix rounds above closed.
   }, [url, db, router, invalidate, offer, settingsLoading]);
 
   return <>{children}</>;
