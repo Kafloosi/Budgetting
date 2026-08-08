@@ -40,8 +40,9 @@ via the Expo Go app over Wi-Fi.
 | Trash with 30-day recovery, undo on delete | Built |
 | JSON backup and restore, CSV export | Built |
 | App lock via the phone's own biometrics | Built |
-| Budget alert notifications | Not started |
-| Receipt photos | Not started |
+| Budget alert notifications | Built |
+| Receipt photos | Built |
+| Statements opened straight from the banking app | Built |
 | Cloud sync | Not started, by design |
 
 ### Data
@@ -137,12 +138,14 @@ the git-ignored `expo-env.d.ts` on first start, and typechecking fails without i
 
 ## Verifying a change
 
-There is no test runner. `npm run typecheck` and `npm run lint` are the checks,
-and the app itself is the third one:
+There is no test runner. `npm run typecheck`, `npm run lint`, and `npm run check`
+(eight scripts under `scripts/`, one per invariant) are the checks, and the app
+itself is the last one:
 
 ```bash
 npm run typecheck
 npm run lint
+npm run check
 npm start          # Expo Go on a phone, or npm run android / npm run web
 ```
 
@@ -150,6 +153,10 @@ The loop worth walking after any change to the ledger: first run → log an expe
 on the keypad → it appears on Month and in the Ledger → put a limit on its
 category → watch the route cross under, warning and over → import a CSV twice and
 confirm the second import inserts nothing.
+
+Then the automatic path: open a statement from the file manager and choose Fare.
+A format it has seen before lands in the ledger with an undo bar and no mapping
+screen; one it has not opens the import screen with the file already loaded.
 
 ## Installable builds
 
@@ -232,7 +239,12 @@ one. Reinstalling at the same code is fine; only downgrades are refused.
 
 ## Next steps
 
-1. Budget alert notifications at 80% and over.
-2. Receipt photos on an entry.
-3. Per-bank CSV presets on top of the generic column mapping.
-4. Store identity: screenshots, listing copy, and an EAS build.
+1. Encrypted export, then SQLCipher with a device-bound key (`AUDIT.md`, F-01).
+2. Share-sheet delivery on Android — `ACTION_SEND` needs a native shim that
+   `expo-linking` does not provide.
+3. Tapping the import reminder notification should open the import screen —
+   today it doesn't, because nothing in the app listens for a notification
+   response. The notification still does its job of telling you; it just
+   can't take you anywhere yet.
+4. Per-bank CSV presets shipped by default, rather than learned on first import.
+5. Store identity: screenshots, listing copy, and an EAS build for iOS.
