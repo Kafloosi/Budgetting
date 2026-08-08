@@ -21,6 +21,8 @@ export interface Settings {
   appLock: boolean;
   /** Notify when a category reaches 80% of its limit, and again when it passes it. */
   budgetAlerts: boolean;
+  /** Notify when nothing has been imported in a while. */
+  importNudge: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -32,6 +34,7 @@ export const DEFAULT_SETTINGS: Settings = {
   // Off until asked for. An app that notifies before being told to is an app
   // whose notifications get turned off at the OS level, permanently.
   budgetAlerts: false,
+  importNudge: false,
 };
 
 export async function loadSettings(db: SQLiteDatabase): Promise<Settings> {
@@ -49,6 +52,7 @@ export async function loadSettings(db: SQLiteDatabase): Promise<Settings> {
       appearance === 'enamel' || appearance === 'porcelain' ? appearance : DEFAULT_SETTINGS.appearance,
     appLock: stored.get('appLock') === '1',
     budgetAlerts: stored.get('budgetAlerts') === '1',
+    importNudge: stored.get('importNudge') === '1',
   };
 }
 
@@ -116,4 +120,31 @@ export async function pruneAlerted(db: SQLiteDatabase, keepMonth: string): Promi
     const month = parts[parts.length - 2];
     if (month < keepMonth) await db.runAsync('DELETE FROM settings WHERE key = ?', [key]);
   }
+}
+
+/**
+ * When the ledger was last nudged for going quiet, or null if never.
+ *
+ * Kept out of `Settings` — a timestamp that moves on its own is not settings
+ * state, the same reasoning that keeps the `alerted:*` keys off it. A single
+ * key rather than a prefixed family: unlike budget alerts, there is only ever
+ * one quiet spell in progress at a time, so there is only ever one timestamp
+ * to remember.
+ */
+const IMPORT_NUDGED_KEY = 'importNudgedAt';
+
+export async function getImportNudgedAt(db: SQLiteDatabase): Promise<string | null> {
+  const row = await db.getFirstAsync<{ value: string }>(
+    'SELECT value FROM settings WHERE key = ?',
+    [IMPORT_NUDGED_KEY],
+  );
+  return row?.value ?? null;
+}
+
+export async function recordImportNudged(db: SQLiteDatabase, when: string): Promise<void> {
+  await db.runAsync(
+    `INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+    [IMPORT_NUDGED_KEY, when, when],
+  );
 }

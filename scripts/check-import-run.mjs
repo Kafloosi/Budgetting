@@ -134,4 +134,41 @@ section('The built hashes deduplicate against the real schema');
   );
 }
 
+const { daysSinceImport, shouldNudge, NUDGE_AFTER_DAYS } = await importSource(
+  'src/lib/import-nudge.ts',
+);
+
+section('The nudge stays quiet until there is something to be quiet about');
+{
+  const now = new Date('2026-08-07T12:00:00.000Z');
+  check('never imported, never nudged', shouldNudge(null, null, now, true), false);
+  check('imported today', shouldNudge('2026-08-07T09:00:00.000Z', null, now, true), false);
+  check('thirteen days', shouldNudge('2026-07-25T12:00:00.000Z', null, now, true), false);
+  check('fourteen days', shouldNudge('2026-07-24T12:00:00.000Z', null, now, true), true);
+  check('turned off', shouldNudge('2026-01-01T12:00:00.000Z', null, now, false), false);
+  check('the threshold is fourteen', NUDGE_AFTER_DAYS, 14);
+  check('days are whole', daysSinceImport('2026-08-01T23:00:00.000Z', now), 5);
+  check('a nonsense timestamp nudges nothing', daysSinceImport('not a date', now), null);
+}
+
+section('At most one nudge per quiet spell');
+{
+  const now = new Date('2026-08-07T12:00:00.000Z');
+  check(
+    'no nudge yet and a stale import nudges',
+    shouldNudge('2026-07-01T12:00:00.000Z', null, now, true),
+    true,
+  );
+  check(
+    'nudged already this spell stays silent',
+    shouldNudge('2026-07-01T12:00:00.000Z', '2026-07-20T12:00:00.000Z', now, true),
+    false,
+  );
+  check(
+    'an import after the nudge re-arms it',
+    shouldNudge('2026-07-10T12:00:00.000Z', '2026-07-01T12:00:00.000Z', now, true),
+    true,
+  );
+}
+
 report('import-run');

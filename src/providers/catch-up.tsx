@@ -6,6 +6,7 @@ import { catchUpRecurring } from '@/db/repositories/recurring';
 import { purgeExpired } from '@/db/repositories/trash';
 import { checkBudgetAlerts } from '@/lib/budget-alerts';
 import { toDateOnly, toMonthKey } from '@/lib/dates';
+import { checkImportNudge } from '@/lib/import-alerts';
 import { useInvalidateLedger } from '@/providers/ledger';
 import { useSettings } from '@/providers/settings';
 
@@ -22,6 +23,9 @@ import { useSettings } from '@/providers/settings';
  * per day, so it is guarded by the date; a limit can be crossed at any hour, so
  * the alert check runs on every foreground and relies on its own record of what it
  * has already sent.
+ *
+ * The import nudge rides along the same way, on its own record of what it has
+ * already sent — see `lib/import-alerts.ts`.
  */
 export function CatchUpProvider({ children }: { children: ReactNode }) {
   const db = useSQLiteContext();
@@ -29,7 +33,7 @@ export function CatchUpProvider({ children }: { children: ReactNode }) {
   const { settings } = useSettings();
   const lastRunDay = useRef<string | null>(null);
 
-  const { budgetAlerts, locale, currency } = settings;
+  const { budgetAlerts, importNudge, locale, currency } = settings;
 
   useEffect(() => {
     let cancelled = false;
@@ -51,6 +55,10 @@ export function CatchUpProvider({ children }: { children: ReactNode }) {
       if (budgetAlerts && !cancelled) {
         await checkBudgetAlerts(db, toMonthKey(today), { locale, currency });
       }
+
+      if (importNudge && !cancelled) {
+        await checkImportNudge(db);
+      }
     }
 
     run();
@@ -62,7 +70,7 @@ export function CatchUpProvider({ children }: { children: ReactNode }) {
       cancelled = true;
       subscription.remove();
     };
-  }, [db, invalidate, budgetAlerts, locale, currency]);
+  }, [db, invalidate, budgetAlerts, importNudge, locale, currency]);
 
   return <>{children}</>;
 }

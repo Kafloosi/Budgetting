@@ -349,6 +349,19 @@ export async function getCategorySpend(
   );
 }
 
+/**
+ * When a statement was last read in, or null if one never has been.
+ *
+ * Derived rather than recorded. A column would be a migration, and the ledger
+ * already knows — an imported row is the only kind that carries source 'import'.
+ */
+export async function lastImportAt(db: SQLiteDatabase): Promise<string | null> {
+  const row = await db.getFirstAsync<{ last: string | null }>(
+    "SELECT MAX(created_at) AS last FROM transactions WHERE source = 'import' AND deleted_at IS NULL",
+  );
+  return row?.last ?? null;
+}
+
 /** Distinct `YYYY-MM` keys that have at least one transaction, newest first. */
 export async function listMonthsWithData(db: SQLiteDatabase): Promise<MonthKey[]> {
   const rows = await db.getAllAsync<{ month: string }>(
