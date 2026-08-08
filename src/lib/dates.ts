@@ -36,13 +36,6 @@ export function shiftDaysByMonth(date: DateOnly, delta: number): DateOnly {
   return toDateOnly(new Date(year, month - 1 + delta, Math.min(day, lastDay)));
 }
 
-/** Whole months from one `YYYY-MM` to another; negative when `to` is earlier. */
-export function monthsBetween(from: MonthKey, to: MonthKey): number {
-  const [fromYear, fromMonth] = from.split('-').map(Number);
-  const [toYear, toMonth] = to.split('-').map(Number);
-  return (toYear - fromYear) * 12 + (toMonth - fromMonth);
-}
-
 /** Days in a `YYYY-MM`. */
 export function daysInMonth(month: MonthKey): number {
   const [year, monthIndex] = month.split('-').map(Number);

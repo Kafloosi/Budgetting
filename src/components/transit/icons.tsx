@@ -281,14 +281,3 @@ export function IconTrash({ size, color }: IconProps) {
     </Frame>
   );
 }
-
-export function IconEdit({ size, color }: IconProps) {
-  return (
-    <Frame size={size}>
-      <G stroke={color} strokeWidth={STROKE} strokeLinecap="round" strokeLinejoin="round">
-        <Path d="M4 20 L4 16 L16 4 L20 8 L8 20 Z" />
-        <Line x1={13} y1={7} x2={17} y2={11} />
-      </G>
-    </Frame>
-  );
-}

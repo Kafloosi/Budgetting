@@ -7,7 +7,6 @@
  * running at this speed.
  */
 
-import type { BudgetProgress } from '@/db/repositories/budgets';
 import type { MonthTotals } from '@/db/repositories/transactions';
 import type { MonthKey } from '@/db/types';
 import { daysInMonth, elapsedDaysInMonth } from '@/lib/dates';
@@ -69,44 +68,4 @@ export function forecastMonth(
       totals.expense_cents > 0 &&
       totals.income_cents > 0,
   };
-}
-
-export interface RouteForecast extends BudgetProgress {
-  /** Positive cents this route is heading for by the end of the month. */
-  projected_cents: number;
-  /** Projected spend past the limit. Zero when it stays inside. */
-  projected_over_cents: number;
-}
-
-/**
- * The same projection per budgeted route, worst first.
- *
- * A route already over its limit needs no forecast to be alarming, so this is
- * about the ones still inside it that will not stay there.
- */
-export function forecastRoutes(
-  month: MonthKey,
-  progress: BudgetProgress[],
-  today = new Date(),
-): RouteForecast[] {
-  const totalDays = daysInMonth(month);
-  const elapsedDays = Math.max(1, elapsedDaysInMonth(month, today));
-
-  return progress
-    .map((entry) => {
-      const projected_cents = Math.round((entry.spent_cents / elapsedDays) * totalDays);
-      return {
-        ...entry,
-        projected_cents,
-        projected_over_cents: Math.max(0, projected_cents - entry.limit_cents),
-      };
-    })
-    .sort((a, b) => overshoot(b) - overshoot(a));
-}
-
-function overshoot(route: RouteForecast): number {
-  // A limit of zero cannot be divided by, and is the worst offender there is
-  // the moment anything at all is projected against it.
-  if (route.limit_cents > 0) return route.projected_cents / route.limit_cents;
-  return route.projected_cents > 0 ? Number.MAX_SAFE_INTEGER : 0;
 }

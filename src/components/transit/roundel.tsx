@@ -8,7 +8,7 @@ import { useTheme } from '@/hooks/use-theme';
  * The roundel — a ring struck through by a bar. It is the product's mark, the
  * shape a category takes in a list, and the shape a station takes on a route.
  */
-export function Roundel({
+function Roundel({
   size = 28,
   color = Line.scarlet,
   barColor,

@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/text';
 import { IconBack, IconClose } from '@/components/transit/icons';
@@ -70,17 +70,6 @@ export function SheetHeader({
   );
 }
 
-/** A grouped block of fields, separated from its neighbours by space, not a box. */
-export function SheetSection({
-  children,
-  style,
-}: {
-  children: React.ReactNode;
-  style?: StyleProp<ViewStyle>;
-}) {
-  return <View style={[styles.section, style]}>{children}</View>;
-}
-
 const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
@@ -113,8 +102,5 @@ const styles = StyleSheet.create({
   },
   rule: {
     height: Stroke.route,
-  },
-  section: {
-    gap: Space.lg,
   },
 });

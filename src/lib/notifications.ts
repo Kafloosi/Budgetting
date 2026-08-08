@@ -14,7 +14,7 @@ import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
 /** Its own channel, so budget alerts can be silenced without silencing the app. */
-export const BUDGET_CHANNEL = 'budget-alerts';
+const BUDGET_CHANNEL = 'budget-alerts';
 
 const supported = Platform.OS === 'ios' || Platform.OS === 'android';
 

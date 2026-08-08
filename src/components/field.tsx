@@ -10,7 +10,6 @@ import {
 } from 'react-native';
 
 import { Text } from '@/components/text';
-import { IconChevronDown } from '@/components/transit/icons';
 import { FontFamily, Radius, Space, Stroke, TouchTarget, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -116,47 +115,6 @@ export function TextField({
         }}
         style={[styles.input, { color: theme.ink }]}
       />
-    </Field>
-  );
-}
-
-/** A field that opens a picker rather than accepting typing. */
-export function SelectField({
-  label,
-  value,
-  placeholder,
-  onPress,
-  leading,
-  hint,
-  style,
-}: {
-  label: string;
-  value: string | null;
-  placeholder: string;
-  onPress: () => void;
-  leading?: ReactNode;
-  hint?: string;
-  style?: StyleProp<ViewStyle>;
-}) {
-  const theme = useTheme();
-  return (
-    <Field
-      label={label}
-      hint={hint}
-      leading={leading}
-      onPress={onPress}
-      style={style}
-      accessibilityLabel={`${label}: ${value ?? placeholder}`}>
-      <View style={styles.selectRow}>
-        <Text
-          variant="body"
-          tone={value ? 'ink' : 'muted'}
-          numberOfLines={1}
-          style={styles.selectValue}>
-          {value ?? placeholder}
-        </Text>
-        <IconChevronDown size={20} color={theme.inkMuted} />
-      </View>
     </Field>
   );
 }

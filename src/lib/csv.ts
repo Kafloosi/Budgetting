@@ -117,7 +117,7 @@ export const DATE_FORMAT_LABELS: Record<DateFormat, string> = {
 };
 
 /** `YYYY-MM-DD`, or null when the value is not a date in the stated format. */
-export function parseDate(value: string, format: DateFormat): string | null {
+function parseDate(value: string, format: DateFormat): string | null {
   const digits = value.trim();
   if (!digits) return null;
 

@@ -25,7 +25,7 @@ function folder(): Directory {
 }
 
 /** The stored file, or null when the row has no receipt or the file has gone. */
-export function receiptFile(name: string | null): File | null {
+function receiptFile(name: string | null): File | null {
   if (!name) return null;
   const file = new File(folder(), name);
   return file.exists ? file : null;
@@ -88,20 +88,4 @@ export async function shootReceipt(): Promise<string | null> {
 export function discardReceipt(name: string | null): void {
   const file = receiptFile(name);
   if (file) file.delete();
-}
-
-/** Total bytes held in receipts, for the backup screen's warning. */
-export function receiptsSize(): { count: number; bytes: number } {
-  const directory = folder();
-  if (!directory.exists) return { count: 0, bytes: 0 };
-
-  let count = 0;
-  let bytes = 0;
-  for (const entry of directory.list()) {
-    if (entry instanceof File) {
-      count++;
-      bytes += entry.size ?? 0;
-    }
-  }
-  return { count, bytes };
 }

@@ -14,8 +14,6 @@ import type { Account } from '../types';
 import { newId, nowIso, withTransaction } from '../util';
 
 /** Seeded by migration 8. Every pre-accounts transaction belongs to it. */
-export const MAIN_ACCOUNT_ID = 'seed-account-main';
-
 /** Kinds offered in the picker. Free-form in the schema; these are the sensible ones. */
 export const ACCOUNT_KINDS = ['checking', 'savings', 'cash', 'credit'] as const;
 export type AccountKind = (typeof ACCOUNT_KINDS)[number];

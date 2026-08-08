@@ -54,11 +54,6 @@ export async function restoreTransaction(db: SQLiteDatabase, id: string): Promis
   ]);
 }
 
-/** Removes a single row for good. */
-export async function purgeTransaction(db: SQLiteDatabase, id: string): Promise<void> {
-  await db.runAsync('DELETE FROM transactions WHERE id = ? AND deleted_at IS NOT NULL', [id]);
-}
-
 /** Empties the trash. */
 export async function purgeAll(db: SQLiteDatabase): Promise<number> {
   const result = await db.runAsync('DELETE FROM transactions WHERE deleted_at IS NOT NULL');

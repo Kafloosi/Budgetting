@@ -36,12 +36,6 @@ export function headerSignature(header: string[]): string | null {
   return cleaned.length === 0 ? null : cleaned.join('|');
 }
 
-export async function listImportPresets(db: SQLiteDatabase): Promise<ImportPreset[]> {
-  return db.getAllAsync<ImportPreset>(
-    'SELECT * FROM import_presets WHERE deleted_at IS NULL ORDER BY name COLLATE NOCASE',
-  );
-}
-
 /** The preset that recognises this file's headings, if one does. */
 export async function findPresetForHeader(
   db: SQLiteDatabase,
@@ -114,13 +108,4 @@ export async function saveImportPreset(
     ],
   );
   return id;
-}
-
-export async function deleteImportPreset(db: SQLiteDatabase, id: string): Promise<void> {
-  const now = nowIso();
-  await db.runAsync('UPDATE import_presets SET deleted_at = ?, updated_at = ? WHERE id = ?', [
-    now,
-    now,
-    id,
-  ]);
 }
