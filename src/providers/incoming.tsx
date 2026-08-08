@@ -1,10 +1,17 @@
 /**
  * A statement that arrives instead of being fetched.
  *
- * Mounted inside AppLockGate deliberately. That gate renders its children only
- * once the lock is open, so this cannot run while the app is locked, and the
- * launch URL is still there to be read when it finally mounts. A file arriving
- * from another app is not a way past the lock, and it takes no queue to say so.
+ * Mounted inside AppLockGate so that a re-lock unmounts it along with the rest
+ * of the app. That alone does not keep it off the file while the app is
+ * *starting* locked: AppLockGate renders its children while `useSettings()` is
+ * still `loading`, because it does not yet know whether a lock is enforced, and
+ * child effects run before parent effects — so this provider's effect would
+ * otherwise fire before settings have even been read. The effect below waits
+ * for `loading` to clear before touching the file, which is what actually
+ * keeps a locked launch from reading anything: either settings finish loading
+ * and say no lock is enforced (children stay mounted, the effect proceeds), or
+ * they say one is (AppLockGate swaps to the lock screen and this unmounts
+ * before its gated effect ever runs).
  *
  * A recognised format goes straight into the ledger. An unrecognised one is
  * handed to the import screen, which is the same screen it would have reached by
@@ -14,13 +21,14 @@
 import { useLinkingURL } from 'expo-linking';
 import { useRouter } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 
 import { findPresetForHeader } from '@/db/repositories/import-presets';
 import { runImport, undoImport } from '@/db/repositories/transactions';
 import { parseCsv, type DateFormat } from '@/lib/csv';
 import { IncomingFileError, readIncomingFile } from '@/lib/incoming-file';
 import { useInvalidateLedger } from '@/providers/ledger';
+import { useSettings } from '@/providers/settings';
 import { useUndo } from '@/providers/undo';
 
 /**
@@ -42,22 +50,36 @@ export function takePendingImport(): { name: string; text: string } | null {
   return held;
 }
 
+/**
+ * The launch URL already turned into an import (or ruled out).
+ *
+ * Module-scoped, not a ref: `useLinkingURL()` reseeds itself from the OS's
+ * stored launch URL — `ExpoLinking.getLinkingURL()` — synchronously on every
+ * mount, for as long as the process lives. AppLockGate unmounts this provider
+ * on re-lock and remounts it on unlock, so a ref would forget the URL was
+ * already handled and reprocess the same file on every unlock. A module-level
+ * value survives the remount the way a ref cannot.
+ */
+let handledUrl: string | null = null;
+
 export function IncomingFileProvider({ children }: { children: ReactNode }) {
   const url = useLinkingURL();
   const db = useSQLiteContext();
   const router = useRouter();
   const invalidate = useInvalidateLedger();
   const { offer } = useUndo();
-
-  // The same launch URL is returned for as long as the app lives, so without
-  // this the file would import again on every re-render.
-  const handled = useRef<string | null>(null);
+  const { loading: settingsLoading } = useSettings();
 
   useEffect(() => {
-    if (!url || handled.current === url) return;
+    // AppLockGate itself renders children while settings are still loading,
+    // because it does not yet know whether a lock is enforced. Waiting here
+    // is what actually keeps a locked launch from being read — see the file
+    // header.
+    if (settingsLoading) return;
+    if (!url || handledUrl === url) return;
     // fare:// links are routes, and expo-router already owns them.
     if (url.startsWith('fare://')) return;
-    handled.current = url;
+    handledUrl = url;
 
     let cancelled = false;
 
@@ -90,9 +112,12 @@ export function IncomingFileProvider({ children }: { children: ReactNode }) {
           format: preset.date_format as DateFormat,
           allNegative: preset.all_negative === 1,
         });
-        if (cancelled) return;
 
+        // Written unconditionally, even if the provider unmounted mid-import
+        // (a re-lock during the write) — the ledger must never be left
+        // written-but-stale just because nothing is around to show a toast.
         invalidate();
+        if (cancelled) return;
 
         if (outcome.inserted === 0) {
           offer(`${preset.name}: nothing new`, () => {});
@@ -115,7 +140,7 @@ export function IncomingFileProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [url, db, router, invalidate, offer]);
+  }, [url, db, router, invalidate, offer, settingsLoading]);
 
   return <>{children}</>;
 }

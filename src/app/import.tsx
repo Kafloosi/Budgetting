@@ -117,6 +117,8 @@ export default function ImportScreen() {
           format: guessDateFormat(parsed.rows.map((row) => row[guessed.date] ?? '')),
           allNegative: false,
         });
+      }).catch((lookupError: Error) => {
+        setError(`Could not read that file. ${lookupError.message}`);
       });
     } catch (readError) {
       setError(`Could not read that file. ${(readError as Error).message}`);
