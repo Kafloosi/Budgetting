@@ -16,6 +16,13 @@
  * A recognised format goes straight into the ledger. An unrecognised one is
  * handed to the import screen, which is the same screen it would have reached by
  * hand — one step shorter, because the file is already open.
+ *
+ * A re-lock can still land mid-flight, after the file has been read (and
+ * deleted) but before anything was imported or shown. That must not be a
+ * silent loss: the cleanup below releases the claim on the URL unless a write
+ * had already started, so a remount retries and — since the file really is
+ * gone by then — reports it instead of doing nothing. See the comments on
+ * `writeStarted` and `settled` in the effect.
  */
 
 import { useLinkingURL } from 'expo-linking';
@@ -82,6 +89,18 @@ export function IncomingFileProvider({ children }: { children: ReactNode }) {
     handledUrl = url;
 
     let cancelled = false;
+    // Becomes true only once `runImport` is actually called. From that point
+    // the claim on `url` must survive an unmount no matter what: the write is
+    // not abortable, so it either lands (a retry would double-import, which
+    // dedupe aside is not this guard's job to invite) or throws (and the
+    // source file is already gone by then regardless, so a retry could only
+    // fail loudly). Read below at the cleanup for the other half of this.
+    let writeStarted = false;
+    // True once the async work has reached a real terminal branch: an
+    // `offer(...)`, a hand-off to the import screen, or the catch block. If
+    // the provider unmounts after that, the file was already fully and
+    // correctly dealt with, and must not be retried.
+    let settled = false;
 
     (async () => {
       try {
@@ -105,6 +124,7 @@ export function IncomingFileProvider({ children }: { children: ReactNode }) {
           return;
         }
 
+        writeStarted = true;
         const outcome = await runImport(db, csv.rows, {
           date: preset.date_column,
           amount: preset.amount_column,
@@ -134,11 +154,23 @@ export function IncomingFileProvider({ children }: { children: ReactNode }) {
             ? error.message
             : `That file could not be read. ${(error as Error).message}`;
         if (!cancelled) offer(message, () => {});
+      } finally {
+        settled = true;
       }
     })();
 
     return () => {
       cancelled = true;
+      // The read already deletes the file, so a cancellation that hits before
+      // any write began (`readIncomingFile` or `findPresetForHeader` still in
+      // flight when a re-lock unmounts this) would otherwise leave the claim
+      // on `url` in place forever: the file is consumed, nothing was
+      // imported, and nothing was told to the user. Releasing it here lets a
+      // remount retry — which, since the file really is gone, surfaces as
+      // "That file is no longer there" instead of silence. Once `settled` or
+      // `writeStarted` is true the work either finished cleanly (nothing to
+      // retry) or started a write (must not be retried), so the claim stays.
+      if (!settled && !writeStarted && handledUrl === url) handledUrl = null;
     };
   }, [url, db, router, invalidate, offer, settingsLoading]);
 
